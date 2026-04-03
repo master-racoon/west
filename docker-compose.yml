@@ -1,0 +1,172 @@
+services:
+  # Development database
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: warehouse-db-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: warehouse_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev-network
+
+  # Test database
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: warehouse-db-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: warehouse_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+    profiles:
+      - test
+      - e2e
+
+  # Neon proxy for test environment (mimics Neon serverless in production)
+  neon-proxy-test:
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    container_name: warehouse-neon-proxy-test
+    environment:
+      - PG_CONNECTION_STRING=postgres://postgres:postgres@postgres-test:5432/warehouse_test
+    ports:
+      - "4445:4444"
+    networks:
+      test-network:
+        aliases:
+          - neon-proxy-test.localtest.me
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    profiles:
+      - test
+      - e2e
+
+  # Test backend (Miniflare/Wrangler for local Cloudflare Workers)
+  backend-test:
+    image: node:20
+    container_name: warehouse-backend-test
+    working_dir: /app
+    command: sh -c "apt-get update && apt-get install -y curl && npm install && cp /tmp/.dev.vars.test .dev.vars && npm run db:migrate && npm run db:seed:e2e && npm run dev"
+    env_file:
+      - ./warehouse-backend/.env.test
+    environment:
+      # Override for migrations to use direct postgres
+      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/warehouse_test
+    networks:
+      - test-network
+    volumes:
+      - ./warehouse-backend:/app
+      - backend-test-node-modules:/app/node_modules
+      - ./warehouse-backend/.dev.vars.test:/tmp/.dev.vars.test:ro
+    ports:
+      - "8789:8788"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      neon-proxy-test:
+        condition: service_started
+    profiles:
+      - test
+      - e2e
+
+  # Test runner service (runs migrations, seeds via API, and runs tests)
+  test-runner:
+    image: node:20
+    container_name: warehouse-test-runner
+    working_dir: /app
+    command: sh -c "npm install && npm run db:migrate && sleep 10 && npm test"
+    env_file:
+      - ./warehouse-backend/.env.test
+    environment:
+      TEST_API_URL: http://backend-test:8788
+      # Override DATABASE_URL for migrations to use direct postgres connection
+      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/warehouse_test
+    volumes:
+      - ./warehouse-backend:/app
+      - test-runner-node-modules:/app/node_modules
+    networks:
+      - test-network
+    depends_on:
+      - backend-test
+    profiles:
+      - test
+
+  # E2E test runner with Playwright (frontend tests)
+  e2e-runner:
+    image: mcr.microsoft.com/playwright:v1.58.2-jammy
+    container_name: warehouse-e2e-runner
+    working_dir: /app
+    environment:
+      CI: "true"
+    volumes:
+      - ./warehouse-frontend:/app
+      - e2e-test-node-modules:/app/node_modules
+      - ./warehouse-frontend/playwright-report:/app/playwright-report
+      - ./warehouse-frontend/test-results:/app/test-results
+    networks:
+      - test-network
+    depends_on:
+      - backend-test
+      - frontend-test
+    profiles:
+      - e2e
+    command: sh -c "npm install && npx playwright install chromium firefox webkit && sleep 5 && npm run test:e2e"
+
+  # Frontend for testing (separate from dev)
+  frontend-test:
+    image: node:20
+    container_name: warehouse-frontend-test
+    working_dir: /app
+    command: sh -c "npm install && npm run dev:test -- --host 0.0.0.0"
+    environment:
+      VITE_API_URL: http://backend-test:8788
+    volumes:
+      - ./warehouse-frontend:/app
+      - frontend-test-node-modules:/app/node_modules
+    ports:
+      - "5174:5173"
+    networks:
+      - test-network
+    depends_on:
+      - backend-test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles:
+      - e2e
+
+networks:
+  dev-network:
+    driver: bridge
+  test-network:
+    driver: bridge
+
+volumes:
+  postgres-dev-data:
+  postgres-test-data:
+  backend-test-node-modules:
+  test-runner-node-modules:
+  e2e-test-node-modules:
+  frontend-test-node-modules:
