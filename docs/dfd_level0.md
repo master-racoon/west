@@ -1,18 +1,3 @@
----
-title: "[DFD-0] Warehouse Inventory System Data Flow"
-lane: todo
-created: 2026-04-01
-updated: 2026-04-01
-description: Map external entities, data flows, and system boundaries for the Warehouse inventory management system
----
-
-## Conversation
-
-### user
-
-Create the DFD-0 for the Warehouse inventory system.
-
-### agent
 
 ## DFD-0: Warehouse Inventory System
 
@@ -41,7 +26,9 @@ The system is a barcode-driven inventory web app with:
 
 **Note**: Read operations (querying inventory, viewing history) are implementation details owned by devs. CONTRACT defines mutations only.
 
-#### **Flow 1: Add Stock (Receiving)**
+**Flow Labels**: Each flow maps to Kanban task labels for filtering and organization. See [Flow-to-Task Label Mapping](#flow-to-task-label-mapping) at the end of this document.
+
+#### **Flow 1: Add Stock (Receiving)** `#flow-1-add-stock`
 
 ```
 User → [Select warehouse] → [Scan barcode] → [If unknown: create item] → [Qty] → [Optional: select bin] → Confirm
@@ -68,7 +55,7 @@ User → [Select warehouse] → [Scan barcode] → [If unknown: create item] →
 
 ---
 
-#### **Flow 2: Remove Stock (Consumption/Sale)**
+#### **Flow 2: Remove Stock (Consumption/Sale)** `#flow-2-remove-stock`
 
 ```
 User → [Select warehouse] → [Scan item] → [Qty] → [If use_bins: select bin] → Confirm
@@ -99,7 +86,7 @@ User → [Select warehouse] → [Scan item] → [Qty] → [If use_bins: select b
 
 ---
 
-#### **Flow 3: Transfer Stock (Between Warehouses/Bins)**
+#### **Flow 3: Transfer Stock (Between Warehouses/Bins)** `#flow-3-transfer-stock`
 
 ```
 User → [Scan item] → [Qty] → [Select source warehouse/bin] → [Select destination warehouse/bin] → Confirm
@@ -126,7 +113,7 @@ User → [Scan item] → [Qty] → [Select source warehouse/bin] → [Select des
 
 ---
 
-#### **Flow 4: Quick Count (Physical Count Adjustment)**
+#### **Flow 4: Quick Count (Physical Count Adjustment)** `#flow-4-quick-count`
 
 ```
 User → [Select warehouse/bin] → [Scan item] → [Enter observed quantity] → Confirm
@@ -154,7 +141,7 @@ User → [Select warehouse/bin] → [Scan item] → [Enter observed quantity] �
 
 ---
 
-#### **Flow 5: Configuration Management (Owner)**
+#### **Flow 5: Configuration Management (Owner)** `#flow-5-configuration`
 
 ```
 Owner → [Create/update warehouse (use_bins: T/F)] → Backend validates & persists → Database
@@ -217,6 +204,21 @@ Owner → [Create/update warehouse (use_bins: T/F)] → Backend validates & pers
 
 ---
 
+### Flow-to-Task Label Mapping
+
+Use these labels to filter Kanban tasks by DFD flow:
+
+| Flow | Label | Tasks |
+|------|-------|-------|
+| Inventory Visibility (Read) | `inventory-visibility` | Search/Scan Item, View Location, View Movement History |
+| Flow 1: Add Stock | `flow-1-add-stock` | Scan & Add Quantity, Register New Item |
+| Flow 2: Remove Stock | `flow-2-remove-stock` | Scan & Remove Quantity, Prevent Negative |
+| Flow 3: Transfer Stock | `flow-3-transfer-stock` | Between Warehouses, With Optional Bins |
+| Flow 4: Quick Count | `flow-4-quick-count` | Physical Count Adjustment |
+| Flow 5: Configuration | `flow-5-configuration` | Warehouse Settings, Manage Items/Barcodes, Export Data |
+
+---
+
 ## Definition of Done
 
 - [x] Identified external entities (Family Users, Owner, Barcode Scanner)
@@ -225,11 +227,3 @@ Owner → [Create/update warehouse (use_bins: T/F)] → Backend validates & pers
 - [x] Identified system boundaries (Backend, Frontend, Database)
 - [x] Cross-cutting concerns documented
 - [x] Read operations (visibility, search, export) scoped as implementation details (devs own)
-
-## Next Steps
-
-→ **[CONTRACT]** tasks will define mutation API endpoints, request/response schemas
-→ **[DEV]** tasks will implement vertical slices within each flow.
-→ **[QA]** task will define test cases (happy path + error paths).
-
-### user
