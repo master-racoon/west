@@ -1,4 +1,15 @@
 lanes:
+  - backlog
   - todo
   - doing
   - done
+labels:
+  - chimichanga
+  - asgaga
+  - flow-5-configuration
+  - flow-1-add-stock
+  - flow-2-remove-stock
+  - flow-3-transfer-stock
+  - flow-4-quick-count
+  - inventory-visibility
+users: []

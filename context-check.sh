@@ -26,15 +26,11 @@ KEY_PATHS=(
   "warehouse-backend/src/db/schema.ts"
   "warehouse-backend/src/authorization/middleware.ts"
   "warehouse-backend/src/utils/errors.ts"
-  "warehouse-backend/src/schemas"
   "warehouse-backend/src/routes"
   "warehouse-backend/src/tests/helpers.ts"
   "warehouse-frontend/src/lib/api.ts"
-  "warehouse-frontend/src/stores/authStore.ts"
   "warehouse-frontend/src/hooks/queries"
   "Makefile"
-  "FRD.md"
-  "CLAUDE.md"
   ".github/copilot-instructions.md"
 )
 
@@ -85,8 +81,6 @@ check_freshness() {
 
 # Check main context files
 check_freshness ".github/copilot-instructions.md"
-check_freshness "CLAUDE.md"
-check_freshness "FRD.md"
 
 if (( WARNINGS == 0 )); then
   ok "All context files are fresh (< $STALE_DAYS days)"
@@ -96,30 +90,7 @@ fi
 
 section "Cross-reference checks"
 
-# Check CLAUDE.md exists and references copilot-instructions.md
-if [[ -f "CLAUDE.md" ]]; then
-  if grep -q "copilot-instructions" CLAUDE.md; then
-    ok "CLAUDE.md references copilot-instructions.md"
-  else
-    warn "CLAUDE.md doesn't reference copilot-instructions.md — may diverge"
-    ((WARNINGS++))
-  fi
-fi
-
-# Check copilot-instructions.md references CLAUDE.md
-if grep -q "CLAUDE.md" .github/copilot-instructions.md; then
-  ok "copilot-instructions.md references CLAUDE.md"
-else
-  warn "copilot-instructions.md doesn't reference CLAUDE.md"
-  ((WARNINGS++))
-fi
-
-# Check FRD.md exists
-if [[ -f "FRD.md" ]]; then
-  ok "FRD.md exists (product specification)"
-else
-  error "FRD.md missing (required for feature specifications)"
-fi
+# No additional cross-reference checks needed — copilot-instructions.md is the single source of truth
 
 # ─── Summary ───
 

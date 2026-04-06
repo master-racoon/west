@@ -1,4 +1,4 @@
-.PHONY: help dev stop clean backend frontend docker logs deploy deploy-backend deploy-frontend test test-backend test-e2e test-all context-check
+.PHONY: help dev stop clean backend frontend docker logs deploy deploy-backend deploy-scheduler deploy-frontend test test-backend test-e2e test-all context-check
 
 # Default target
 help:
@@ -14,14 +14,15 @@ help:
 	@echo "  make test-backend     - Run backend tests only"
 	@echo "  make test-e2e         - Run E2E tests"
 	@echo "  make context-check    - Validate AI context files against actual codebase"
-	@echo "  make deploy     - Deploy all services (backend, frontend)"
+	@echo "  make deploy     - Deploy all services (backend, scheduler, frontend)"
 	@echo "  make deploy-backend   - Deploy backend API only"
+	@echo "  make deploy-scheduler - Deploy scheduler Worker only"
 	@echo "  make deploy-frontend  - Deploy frontend only"
 
 # Start all services in correct order
 dev:
 	@echo "Starting docker-compose..."
-	@docker-compose up -d postgres-dev
+	@cd warehouse-backend && docker-compose up -d
 	@echo "Waiting for database to be ready..."
 	@sleep 3
 	@echo "Starting backend (this will generate OpenAPI specs)..."
@@ -35,7 +36,7 @@ dev:
 # Start backend with docker
 backend:
 	@echo "Starting docker-compose..."
-	@docker-compose up -d postgres-dev
+	@cd warehouse-backend && docker-compose up -d
 	@echo "Waiting for database to be ready..."
 	@sleep 3
 	@echo "Starting backend..."
@@ -49,7 +50,7 @@ frontend:
 # Start docker only
 docker:
 	@echo "Starting docker-compose..."
-	@docker-compose up -d postgres-dev
+	@cd warehouse-backend && docker-compose up -d
 	@echo "Docker services started!"
 
 # Stop all services
@@ -59,22 +60,22 @@ stop:
 	@echo "Stopping backend..."
 	@pkill -f "tsx.*warehouse-backend" || true
 	@echo "Stopping docker-compose..."
-	@docker-compose down
+	@cd warehouse-backend && docker-compose down
 	@echo "All services stopped!"
 
 # Clean up everything
 clean: stop
 	@echo "Cleaning up..."
-	@docker-compose down -v
+	@cd warehouse-backend && docker-compose down -v
 	@echo "Cleanup complete!"
 
 # Show logs
 logs:
 	@echo "=== Docker logs ==="
-	@docker-compose logs --tail=50
+	@cd warehouse-backend && docker-compose logs --tail=50
 
 # Deploy all services to production
-deploy: deploy-backend deploy-frontend
+deploy: deploy-backend deploy-scheduler deploy-frontend
 	@echo "🚀 All services deployed successfully!"
 
 # Deploy backend API to Cloudflare Pages
@@ -82,6 +83,12 @@ deploy-backend:
 	@echo "📦 Deploying backend API to Cloudflare Pages..."
 	@cd warehouse-backend && npm run deploy
 	@echo "✅ Backend API deployed!"
+
+# Deploy scheduler Worker to Cloudflare
+deploy-scheduler:
+	@echo "⏰ Deploying scheduler Worker to Cloudflare..."
+	@cd warehouse-backend && npm run scheduler:deploy
+	@echo "✅ Scheduler Worker deployed!"
 
 # Deploy frontend to Cloudflare Pages
 deploy-frontend:

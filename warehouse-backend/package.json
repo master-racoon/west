@@ -1,0 +1,39 @@
+{
+  "name": "warehouse-backend",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev",
+    "build": "wrangler build",
+    "deploy": "wrangler pages deploy",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts .env.local",
+    "db:migrate:prod": "tsx src/db/migrate.ts .env.prod",
+    "db:drop": "drizzle-kit drop",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/zod-openapi": "^1.1.5",
+    "@neondatabase/serverless": "^0.9.5",
+    "better-auth": "1.4.1",
+    "drizzle-orm": "^0.33.0",
+    "hono": "^4.6.3",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "@types/node": "^22.9.0",
+    "dotenv": "^17.4.1",
+    "drizzle-kit": "^0.24.0",
+    "postgres": "^3.4.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.3",
+    "vitest": "^1.6.1",
+    "wrangler": "^3.114.17"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
