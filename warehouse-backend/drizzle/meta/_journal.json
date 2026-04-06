@@ -8,6 +8,13 @@
       "when": 1775477321091,
       "tag": "0000_elite_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775515407253,
+      "tag": "0001_abnormal_human_robot",
+      "breakpoints": true
     }
   ]
 }

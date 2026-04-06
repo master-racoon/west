@@ -1,5 +1,5 @@
 {
-  "id": "24508a80-1289-4489-bb19-e206166f41cc",
+  "id": "4ca8cc53-ef08-41f4-9150-8a26a9b408ba",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -50,22 +50,14 @@
         "warehouse_name_unique": {
           "name": "warehouse_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
+      }
     }
   },
   "enums": {},
   "schemas": {},
   "sequences": {},
-  "roles": {},
-  "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

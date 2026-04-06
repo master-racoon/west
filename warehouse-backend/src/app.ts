@@ -3,6 +3,7 @@ import { logger } from "hono/logger";
 import { createDbClient } from "./db";
 import { AppError } from "./utils/errors";
 import warehouseRoutes from "./routes/warehouses";
+import binsRoutes from "./routes/bins";
 
 interface Bindings {
   DATABASE_URL?: string;
@@ -79,6 +80,8 @@ app.onError((err, c) => {
 
 // Routes
 app.route("/api/warehouses", warehouseRoutes);
+app.route("/api/bins", binsRoutes);
+app.route("/api/warehouses", binsRoutes);
 
 // Health check
 app.get("/health", (c) => {
