@@ -22,6 +22,8 @@ Backend: http://localhost:8788
 - **Frontend**: React SPA + TanStack Query + Zustand + Cloudflare Pages
 - **Auth**: BetterAuth (email/password)
 
+See [docs/architecture.md](docs/architecture.md) for environment files, Docker/config wiring, and runtime flow.
+
 See `.github/copilot-instructions.md` for detailed architecture.
 
 ## Development
