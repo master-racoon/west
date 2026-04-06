@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-2.1 Scan and Add Stock to Warehouse"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "User scans barcode, enters quantity, and adds stock to warehouse"
@@ -129,6 +129,17 @@ export function useInventoryBalance(filters?: InventoryFilter) {
   - Show toast on barcode not found
   - Show validation error if quantity ≤ 0
   - Show error if bin required but not selected
+
+---
+
+## Acceptance Criteria (Frontend Functional)
+
+- Feature is implemented in the object-oriented `Inventory` page under the `Add` tab.
+- Barcode input supports scan-first workflow (auto-focus/enter handling) and resolves item identity before submit.
+- Warehouse selection controls conditional bin behavior; bin selector only appears when `use_bins = true`.
+- Submit button is disabled during mutation to prevent duplicate submissions from rapid scan workflows.
+- Success state confirms movement and resets actionable fields for next scan cycle.
+- Error states provide clear recovery for unknown barcode, invalid quantity, and missing required bin.
 
 ---
 

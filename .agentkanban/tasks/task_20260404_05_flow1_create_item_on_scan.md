@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-2.2 Create Item On-the-Fly During Scan"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "User creates new item and assigns barcode when scanning unknown product"
@@ -91,6 +91,17 @@ export function useQuickCreateItem() {
   - Wait for item creation
   - On success, re-trigger barcode lookup (now succeeds)
   - Continue ADD stock workflow (user enters quantity, etc.)
+
+---
+
+## Acceptance Criteria (Frontend Functional)
+
+- Unknown barcode path from `Inventory` → `Add` tab opens inline quick-create UI without leaving the workflow.
+- Quick-create form pre-fills barcode as read-only and enforces required `name` with inline validation.
+- Create action shows pending state and prevents duplicate submissions while request is in flight.
+- On success, modal closes and parent add-stock flow continues with created item selected/resolved.
+- Cancel action returns user to add-stock form with no side effects on current form context.
+- Conflict/error responses are shown clearly with recovery guidance (retry or use existing item).
 
 ---
 

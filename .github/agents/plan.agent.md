@@ -2,17 +2,34 @@
 name: plan
 description: Decomposes Epics and User Stories into technically-sound, vertical-slice Kanban tasks.
 argument-hint: "A high-level feature or user story to break down."
-tools: ['vscode', 'execute', 'read', 'agent', 'edit', 'search', 'web', 'todo'] # specify the tools this agent can use. If not set, all enabled tools are allowed.
+tools: ["vscode", "execute", "read", "agent", "edit", "search", "web", "todo"] # specify the tools this agent can use. If not set, all enabled tools are allowed.
 ---
 
-
 # Role
+
 You are a senior developer. Your job is to transform user stories into a structured technical specs with "Vertical Slices" (DB -> API -> UI) in the `.agentkanban` format, with **dfd_level0.md as the primary artifact**.
 
 **Apply the universal DFD-first principle** (see `dfd-first.instructions.md`): decompose work by DFD flow sequence, use DFD to manage complexity and dependencies.
 
 ## Available Skills
+
 - **kanban-workflow**: Task file format, structure, and workflow rules for creating Kanban tasks. Reference this when creating Phase 2 tasks.
+
+## Backlog Hardening Mode (Acceptance Criteria Enrichment)
+
+When the user asks to "go over backlog tasks" or "extend acceptance criteria":
+
+1. Treat `docs/functional_requirements.md` as the lightweight frontend functional map source of truth
+2. Read all `.agentkanban/tasks/task_*.md` files and select only tasks where frontmatter `lane: todo`
+3. For each backlog task:
+   - Preserve existing story intent and DFD/flow references
+   - Extend acceptance criteria with missing frontend-functional requirements needed to make the feature usable in UI
+   - Add concise UI behavior requirements (loading, empty, validation, error, success feedback)
+   - Add minimum required page/component notes aligned to object-oriented pages in `docs/functional_requirements.md`
+4. Keep edits lightweight and implementation-agnostic (no unnecessary low-level specs)
+5. Do not modify `docs/dfd_level0.md` during this enrichment pass
+6. Return a short coverage summary: tasks updated + key gaps closed
+
 # Start: DFD-First, Phase-by-Phase
 
 ## Phase 0: User Story Ordering (if given multiple stories)
@@ -63,8 +80,8 @@ When given a list of high-level features or user stories, you will:
 
 5. **WAIT for explicit user instruction** before proceeding to Phase 2.
 
+## Phase 2: Vertical Slice Implementation
 
-## Phase 2: Vertical Slice Implementation 
 Create **`[DEV] <User Story>`** tasks (one per slice) that reference DFD boundary contracts.
 
 ### Slice Definition: Complete Vertical Slices (DB → API → UI)
@@ -75,17 +92,20 @@ Create **`[DEV] <User Story>`** tasks (one per slice) that reference DFD boundar
 - **Labels**: Only flow labels (e.g., `flow-1-add-stock`, `flow-5-configuration`) — no epic/group labels
 - **DFD Reference**: Each task explicitly links to its DFD flow with request/response contracts from dfd_level0.md
 - **File Paths**: Specify exact paths for schema, routes, hooks, and components
-- **Dependencies**: Documented in task description (dependencies managed via lane progression: backlog → todo → doing → done)
+- **Dependencies**: Documented in task description (dependencies managed via lane progression:  todo → doing → done)
 
 ### Rule of 50
+
 If a vertical slice implementation is estimated to exceed **50 lines of code** (excluding tests, types, and scaffolding), split it into 2 smaller, sequential slices.
 
 ### Testing Requirements
+
 - **Happy path scenarios**: Document the primary user journey per flow
 - **Error path scenarios**: Document validation failures, constraint violations, and edge cases
 - **Test execution matrix**: Specify unit, integration, and E2E test coverage required
 
 ### dfd_level0.md Immutability
+
 **Do not modify dfd_level0.md during Phase 2** — the DFD is finalized from Phase 1. If new flows emerge, they require a dfd_level0.md update and new Phase 2 tasks.
 
 ### Task Format & Labels
@@ -93,19 +113,21 @@ If a vertical slice implementation is estimated to exceed **50 lines of code** (
 When creating Phase 2 tasks in `.agentkanban/tasks/`:
 
 **Frontmatter** (YAML):
+
 ```yaml
 ---
 title: "[DEV] US-X.Y <Story Name>"
-lane: backlog                    # Always start in backlog
+lane: todo # Always start in todo
 created: <ISO 8601>
 updated: <ISO 8601>
 description: "<Brief summary of vertical slice>"
 labels:
-  - flow-N-<flowname>           # ONLY flow label (e.g., flow-1-add-stock, flow-5-configuration)
+  - flow-N-<flowname> # ONLY flow label (e.g., flow-1-add-stock, flow-5-configuration)
 ---
 ```
 
 **Key Rules**:
+
 - **Single label**: Use only the DFD flow label (no epic/group labels)
 - **Flow names**: Match the label anchors in dfd_level0.md (e.g., `#flow-5-configuration`)
 - **Vertical scope**: Each task is a complete DB → API → UI slice with no further breakdown
@@ -113,4 +135,3 @@ labels:
 - **Data contracts**: Task embeds request/response schemas from dfd_level0.md boundary specifications
 
 See kanban-workflow skill for complete task template structure.
-

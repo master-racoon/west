@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-3.1 Scan and Remove Stock from Warehouse"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "User removes quantity from warehouse with owner override for negative stock"
@@ -108,6 +108,16 @@ export function useRemoveStock() {
   - Owner can view removal request (item, warehouse, quantity, original user)
   - Owner button: "Approve" → submits removeStock with owner_override = true
   - Owner button: "Reject" → closes request, user cannot proceed
+
+  ***
+
+  ## Acceptance Criteria (Frontend Functional)
+  - Feature is implemented in the object-oriented `Inventory` page under the `Remove` tab.
+  - Remove workflow shows item/warehouse context and current availability before final submit.
+  - Bin selector appears only when selected warehouse uses bins and is required before submit.
+  - Shortfall path is handled as a guided UI branch (warning modal/prompt), not a generic failure toast.
+  - Remove action supports loading/success/error states and prevents duplicate submissions.
+  - Successful removal updates visible inventory context immediately for continued operations.
 
 ---
 

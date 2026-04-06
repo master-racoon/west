@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-1.3 Create and Manage Bins (Conditional)"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "Owner creates bins/shelves in warehouses when use_bins=true"
@@ -109,6 +109,17 @@ export function useBinsByWarehouse(warehouseId: string) {
    - Filter by warehouse (via URL param or select)
    - Display bins as list/cards
    - Option to delete bin (if 0 inventory) — future task
+
+---
+
+## Acceptance Criteria (Frontend Functional)
+
+- Feature is available from the object-oriented `Bins` page for `Owner` users.
+- Warehouse filter shows only warehouses relevant for bin management and indicates when bins are disabled.
+- Bin create form is blocked with clear guidance when selected warehouse has `use_bins = false`.
+- Bin list supports loading, empty, and error states per warehouse context.
+- Successful bin creation updates the currently filtered list without manual refresh.
+- Duplicate bin-name conflicts are displayed inline and keep user-entered values for correction.
 
 ---
 

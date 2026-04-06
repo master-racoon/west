@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-6 Inventory Visibility (Search, History, Location)"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "Users view inventory levels, movement history, and item locations"
@@ -136,6 +136,17 @@ export function useSearchItems(query: string) {
   - Display current inventory per warehouse/bin
   - List movements in reverse chronological order
   - Highlight recent movements (e.g., timestamp < 1 hour: bold)
+
+---
+
+## Acceptance Criteria (Frontend Functional)
+
+- Feature is delivered through object-oriented read pages: `Inventory Explorer` and `Movements`.
+- Search UX supports barcode/name/id lookup with debounce and clear no-results handling.
+- Search results provide direct navigation to item-level detail context.
+- Item detail presents both location availability and movement history without losing selected item context.
+- Read views include loading, empty, and error states for search, balances, and movement datasets.
+- Movement history supports practical filtering/pagination for real operational use.
 
 ---
 

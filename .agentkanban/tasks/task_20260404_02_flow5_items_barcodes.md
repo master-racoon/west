@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-1.2 Create and Manage Items with Barcodes"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "Owner creates items and assigns multiple barcodes to track SKUs"
@@ -150,6 +150,17 @@ export function useAddBarcode() {
    - Button to add new barcode
    - Modal/form for entering new barcode
    - List of barcodes with option to view (future: delete if needed)
+
+---
+
+## Acceptance Criteria (Frontend Functional)
+
+- Feature is available from the object-oriented `Items` page for `Owner` users.
+- Items page supports list/search, create form, and barcode management in one coherent workflow.
+- Item creation form enforces required `name` and barcode field validation with inline feedback.
+- Barcode add action updates visible barcode list immediately and surfaces uniqueness conflicts clearly.
+- Items list and item detail views include loading, empty, and error states.
+- Newly created item is discoverable from Inventory operational flows (lookup/select) without manual reload.
 
 ---
 

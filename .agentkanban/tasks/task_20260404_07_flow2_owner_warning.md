@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-3.2 Warn Owner of Stock Shortfall"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "Owner receives notification and approves removals that would cause negative stock"
@@ -143,6 +143,17 @@ export function useApproveRemoval() {
 - On 402 error, show modal: "Removal requires owner approval. Request sent."
 - Modal has "OK" button to dismiss
 - Optionally send notification to owner (push/email — out of scope for MVP)
+
+---
+
+## Acceptance Criteria (Frontend Functional)
+
+- Owner-approval UX is available as part of the shortfall branch from the `Inventory` remove workflow.
+- Non-owner users receive clear "approval required" state with next action (request/cancel) when stock is insufficient.
+- Owner users can approve or reject via the selected UX mode (synchronous modal or owner queue page).
+- Approval decision is reflected back in requester workflow with clear final state (approved-completed or rejected-cancelled).
+- Approval UI includes loading, empty, and error states for pending requests/actions.
+- Override actions are role-gated in UI to prevent non-owner execution paths.
 
 ---
 

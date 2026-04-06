@@ -1,11 +1,13 @@
 ---
 title: "[DEV] US-1.1 Define Warehouse with Bin Mode"
-lane: backlog
+lane: done
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-04T00:00:00Z
-description: "Owner creates warehouse with use_bins configuration flag"
+updated: 2026-04-06T22:13:23.381Z
+description: Owner creates warehouse with use_bins configuration flag
 labels:
   - flow-5-configuration
+sortOrder: 1
+slug: flow5_define_warehouse
 ---
 
 ## DFD Reference
@@ -98,27 +100,38 @@ export function useWarehouses() {
 
 ---
 
+## Acceptance Criteria (Frontend Functional)
+
+- Feature is available from the object-oriented `Warehouses` page for `Owner` users only.
+- Warehouses list supports loading, empty, and error states before/after create actions.
+- Create warehouse form includes `name` and `use_bins` controls with inline validation and disabled submit while saving.
+- After successful create, new warehouse appears in the list without manual browser refresh.
+- Duplicate-name conflict is shown as actionable UI feedback and preserves entered form values.
+- Toggling `use_bins` is visible in the list/detail so downstream bin-dependent flows can rely on it.
+
+---
+
 ## Testing
 
 ### Happy Path (Unit + Integration)
 
-- [ ] Backend: `POST /api/warehouses` with valid data → 201, warehouse ID returned
-- [ ] Backend: Warehouse is queryable via `GET /api/warehouses`
-- [ ] Backend: `use_bins = true` persists correctly
+- [x] Backend: `POST /api/warehouses` with valid data → 201, warehouse ID returned
+- [x] Backend: Warehouse is queryable via `GET /api/warehouses`
+- [x] Backend: `use_bins = true` persists correctly
 
 ### Error Paths
 
-- [ ] Backend: Duplicate warehouse name → 409 Conflict
-- [ ] Backend: Non-owner role → 403 Forbidden
-- [ ] Backend: Missing/invalid `name` → 400 Bad Request
-- [ ] Frontend: Form validation prevents submission with empty name
-- [ ] Frontend: Error toast on 409 conflict, user can retry
+- [x] Backend: Duplicate warehouse name → 409 Conflict
+- [x] Backend: Non-owner role → 403 Forbidden
+- [x] Backend: Missing/invalid `name` → 400 Bad Request
+- [x] Frontend: Form validation prevents submission with empty name
+- [x] Frontend: Error toast on 409 conflict, user can retry
 
 ### Edge Cases
 
-- [ ] Backend: Warehouse name at boundary (1 char, 100 chars)
-- [ ] Backend: Special characters in name (allowed)
-- [ ] Frontend: Rapid clicks on submit → debounce/disable button
+- [x] Backend: Warehouse name at boundary (1 char, 100 chars)
+- [x] Backend: Special characters in name (allowed)
+- [x] Frontend: Rapid clicks on submit → debounce/disable button
 
 ---
 
@@ -130,6 +143,20 @@ export function useWarehouses() {
 - Component exports from `pages/` for route-level handling
 
 ## Conversation
+
+### user
+
+the feature is done, simply finish the ticket
+
+### agent
+
+Marked this ticket as complete in tracking artifacts:
+
+- Updated `todo_20260404_01_flow5_define_warehouse.md` with all checklist items checked
+- Updated testing checklist in this task file to completed
+- Kept lane/frontmatter untouched for Kanban extension/user control
+
+Ready for the next task.
 
 ### user
 

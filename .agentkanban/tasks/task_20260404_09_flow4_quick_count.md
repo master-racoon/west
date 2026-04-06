@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-5.1 Quick Count and Reconcile Inventory"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "User counts physical items and adjusts inventory to match observation"
@@ -100,6 +100,16 @@ export function useCountAdjust() {
   - Observed quantity ≥ 0
   - Item must be selected
   - If warehouse uses bins, bin must be selected
+
+  ***
+
+  ## Acceptance Criteria (Frontend Functional)
+  - Feature is implemented in the object-oriented `Inventory` page under the `Quick Count` tab.
+  - User sees current recorded balance context for selected warehouse/bin/item before entering observed value.
+  - Bin selection is conditionally required based on warehouse `use_bins` configuration.
+  - Delta preview/result clearly communicates gain, loss, or no-change outcomes.
+  - Submit action includes loading/success/error states and prevents duplicate submissions.
+  - After submit, result summary remains visible long enough for verification and then supports fast next-count workflow.
 
 ---
 

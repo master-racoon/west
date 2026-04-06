@@ -3,18 +3,68 @@
 A barcode-driven inventory web app for a small family team to track items across warehouses. The system records every movement of stock, optionally tracks bins/shelves, and keeps the interface optimized for fast scanning workflows.
 
 **DFD Reference**: See [docs/dfd_level0.md](dfd_level0.md) for data flows and boundary contracts.
+**Functional Requirements**: See [docs/functional_requirements.md](functional_requirements.md) for consolidated functional requirements.
 
 ---
 
 ## Phase 0: Dependency Ordering
 
-The user stories are sorted by **DFD flow sequence**. Foundational operations must precede dependent ones:
+The user stories are sorted by **implementation dependency first**, then **DFD flow sequence** for mutation flows:
+
+0. **App Shell & Access (Non-DFD Enabler)** — authenticated layout + side menu must exist before domain pages can be attached
 
 1. **Configuration Management** (`#flow-5-configuration`) — Owner must define warehouses, items, bins
 2. **Add Stock** (`#flow-1-add-stock`) — Receive inventory first
 3. **Remove Stock** (`#flow-2-remove-stock`) — Consume from existing inventory
 4. **Transfer Stock** (`#flow-3-transfer-stock`) — Move between locations
 5. **Quick Count** (`#flow-4-quick-count`) — Reconcile discrepancies
+
+---
+
+## Platform Enablers (Non-DFD)
+
+These stories are intentionally **not represented as DFD mutation flows**. They provide frontend/auth scaffolding required for subsequent domain stories.
+
+### US-0.1: Access Password-Protected App Shell with Domain Side Menu
+
+**DFD Flow**: N/A (non-critical mutation flow; platform scaffold)
+
+**Role**: Family User, Owner
+
+**Story**: As a user, I want to access a password-protected application layout with a side menu listing all inventory domains, so future stories can plug into a consistent shell.
+
+**Acceptance Criteria**:
+
+- Unauthenticated user is redirected to login when trying to access protected app routes
+- Authenticated user can access a protected layout wrapper
+- Protected layout includes a persistent side menu
+- Side menu contains domain entries as placeholders for upcoming stories:
+  - Configuration
+  - Add Stock
+  - Remove Stock
+  - Transfer Stock
+  - Quick Count
+  - Inventory Visibility
+- Selecting a side menu entry routes to corresponding domain page scaffold (can be placeholder states)
+- Logout action is available from protected layout
+
+**Boundary Contracts** (Auth endpoints only):
+
+- `POST /api/auth/login`
+  - Request: `{ password: string (min 8 chars) }`
+  - Response (success): `{ session_token: string, user: { id: UUID, role: 'owner' | 'user' } }`
+  - Response (error): `{ error: string }`
+- `POST /api/auth/logout`
+  - Request: `{}` (session from cookie/header)
+  - Response: `{ success: boolean }`
+- `GET /api/auth/session`
+  - Response (authenticated): `{ authenticated: true, user: { id: UUID, role: 'owner' | 'user' } }`
+  - Response (anonymous): `{ authenticated: false }`
+
+**Notes**:
+
+- This is a foundational UI/auth scaffold story and does not change inventory movement contracts.
+- Domain pages can initially be placeholders and are expanded by later user stories.
 
 ---
 
@@ -300,34 +350,3 @@ Each user story (or group of closely related stories) becomes a **Phase 2 `/[DEV
 2. Boundary data contract for request/response validation
 3. Vertical slice assignment (DB → API route → UI component)
 4. Testing requirements (happy path, error paths, edge cases)
-
-movement history
-
-2.11 User roles
-Two roles exist.
-Owner
-Can:
-change settings
-
-override negative inventory
-
-manage items/bins/users
-
-User
-Can:
-add
-
-remove
-
-transfer
-
-count
-
-2.12 Data export
-Owner can export:
-current inventory
-
-movement history
-
-Formats:
-CSV

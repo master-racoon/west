@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-4.1 Transfer Stock Between Warehouses"
-lane: backlog
+lane: todo
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "User transfers quantity of item between warehouses with optional bin selection"
@@ -106,6 +106,16 @@ export function useTransferStock() {
   - If source uses bins, source_bin required
   - If dest uses bins, dest_bin required
   - Source balance must be ≥ quantity (checked on submit)
+
+  ***
+
+  ## Acceptance Criteria (Frontend Functional)
+  - Feature is implemented in the object-oriented `Inventory` page under the `Transfer` tab.
+  - Source and destination selectors enforce distinct warehouses in UI before submit.
+  - Bin selectors are shown independently based on each selected warehouse `use_bins` setting.
+  - Transfer form surfaces source availability context before mutation to reduce failed submits.
+  - Submit action provides loading/success/error states and prevents duplicate transfer submissions.
+  - Successful transfer updates current inventory context and clears actionable fields for next transfer.
 
 ---
 
