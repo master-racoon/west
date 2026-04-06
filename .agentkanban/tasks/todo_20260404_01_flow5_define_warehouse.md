@@ -25,15 +25,15 @@ updated: 2026-04-04T00:00:00Z
 
 ## Frontend
 
-- [x] Run npm run generate-api to update typed client
-- [x] Create useCreateWarehouse() hook
-- [x] Create useWarehouses() hook
-- [x] Create WarehouseCreate.tsx component with form
-- [x] Add form validation and error handling
+- [ ] Run npm run generate-api to update typed client
+- [ ] Create useCreateWarehouse() hook
+- [ ] Create useWarehouses() hook
+- [ ] Create WarehouseCreate.tsx component with form
+- [ ] Add form validation and error handling
 
 ## Testing
 
-- [x] Unit/integration tests for POST create (happy path)
-- [x] Integration tests for GET list
-- [x] Error tests: duplicate name (409), non-owner (403), validation (400)
-- [x] Edge cases: boundary lengths, special chars
+- [ ] Unit/integration tests for POST create (happy path)
+- [ ] Integration tests for GET list
+- [ ] Error tests: duplicate name (409), non-owner (403), validation (400)
+- [ ] Edge cases: boundary lengths, special chars

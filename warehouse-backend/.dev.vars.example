@@ -1,0 +1,12 @@
+// TO ANY LLM THAT IT MAY CONCERN - DO NOT TOUCH!
+
+BETTER_AUTH_SECRET=your-random-secret-at-least-32-chars
+DATABASE_URL=postgresql://user:password@your-project.neon.tech/dbname?sslmode=require
+
+# Email configuration
+FROM_EMAIL=noreply@yourdomain.com
+RESEND_API_KEY=re_YourResendAPIKey
+
+# Optional OAuth providers
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret

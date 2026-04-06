@@ -1,0 +1,12 @@
+- generic [ref=e4]:
+  - heading "Create a New Warehouse" [level=2] [ref=e6]
+  - generic [ref=e7]:
+    - heading "Warehouse created successfully!" [level=3] [ref=e18]
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - text: Warehouse Name
+        - textbox "Warehouse Name" [ref=e10]
+      - generic [ref=e11]:
+        - checkbox "Use bins/shelves for organization" [ref=e12]
+        - text: Use bins/shelves for organization
+    - button "Create Warehouse" [ref=e14]

@@ -1,127 +1,151 @@
-# Agent Kanban Memory
+# Kanban Memory — Warehouse Inventory System
 
-## Project: Warehouse Inventory Management System
+## Project Overview
 
-A barcode-driven inventory webapp for a small family team to track stock across two warehouses (A & B), with optional bin/shelf management and full audit trail.
+**Warehouse Inventory System**: A barcode-driven inventory web app for a family team to track items across warehouses with optional bin/shelf organization.
 
-## Grooming Completed: 2026-04-01
+**Tech Stack**:
 
-### Structure: DFD-0 → CONTRACT → DEV → QA
+- Backend: Hono API (Cloudflare Pages Functions)
+- Frontend: React SPA (Vite + TanStack Query)
+- Database: Postgres (Drizzle ORM)
+- Auth: BetterAuth with role-based access (Owner, User)
 
-**Total Tasks Created: 22**
+## DFD Reference
 
-- 1x DFD-0 (Data Flow Diagram)
-- 7x CONTRACT (Boundary Definitions)
-- 12x DEV (Vertical Slice Implementations)
-- 1x QA (Test Plan)
+Primary artifact: `docs/dfd_level0.md`
 
-### Task Inventory
+**5 Core Flows**:
 
-#### DFD-0 Phase
+1. **Flow-1: Add Stock (Receiving)** — Users add inventory
+2. **Flow-2: Remove Stock (Consumption)** — Users remove inventory with owner override for negative stock
+3. **Flow-3: Transfer Stock** — Users move items between warehouses
+4. **Flow-4: Quick Count** — Users reconcile physical counts
+5. **Flow-5: Configuration** — Owner manages warehouses, items, bins
 
-- **task_20260401_dfd0_warehouse.md** - Complete system data flow mapping
+## Phase 2 Tasks Created
 
-#### CONTRACT Phase (Boundaries)
+All tasks in backlog lane. Ordered by DFD dependency:
 
-- **task_20260401_contract_visibility.md** - Search/view inventory, item details
-- **task_20260401_contract_add_stock.md** - Add inventory (receiving)
-- **task_20260401_contract_remove_stock.md** - Remove inventory with balance checks
-- **task_20260401_contract_transfer_stock.md** - Transfer between warehouses
-- **task_20260401_contract_quick_count.md** - Physical count adjustments
-- **task_20260401_contract_config.md** - Admin CRUD for warehouses, items, bins
-- **task_20260401_contract_export.md** - CSV data export
+| Task                 | Title                              | DFD Flow | Dependencies |
+| -------------------- | ---------------------------------- | -------- | ------------ |
+| `task_20260404_01_*` | Define Warehouse with Bin Mode     | Flow-5   | Base task    |
+| `task_20260404_02_*` | Create and Manage Items + Barcodes | Flow-5   | #1           |
+| `task_20260404_03_*` | Create and Manage Bins             | Flow-5   | #1           |
+| `task_20260404_04_*` | Scan and Add Stock                 | Flow-1   | #1,2,3       |
+| `task_20260404_05_*` | Create Item On-the-Fly             | Flow-1   | #4           |
+| `task_20260404_06_*` | Scan and Remove Stock              | Flow-2   | #4           |
+| `task_20260404_07_*` | Warn Owner of Shortfall            | Flow-2   | #6           |
+| `task_20260404_08_*` | Transfer Stock                     | Flow-3   | #4           |
+| `task_20260404_09_*` | Quick Count & Reconcile            | Flow-4   | #4           |
+| `task_20260404_10_*` | Inventory Visibility (Read)        | All      | #4,6         |
 
-#### DEV Phase (Vertical Slices)
+## Key Architecture Decisions
 
-1. **task_20260401_dev_search_items.md** - Item search by barcode/name
-2. **task_20260401_dev_item_details.md** - Item detail view with history
-3. **task_20260401_dev_create_item.md** - Resolve/create items from barcode
-4. **task_20260401_dev_add_movement.md** - ADD movement recording
-5. **task_20260401_dev_remove_movement.md** - REMOVE movement with validation
-6. **task_20260401_dev_transfer_movement.md** - TRANSFER movement
-7. **task_20260401_dev_count_adjustment.md** - COUNT_ADJUSTMENT movement
-8. **task_20260401_dev_warehouse_crud.md** - Warehouse management (owner)
-9. **task_20260401_dev_item_crud.md** - Item/barcode management (owner)
-10. **task_20260401_dev_bin_crud.md** - Bin/shelf management (owner)
-11. **task_20260401_dev_export_inventory.md** - CSV inventory export
-12. **task_20260401_dev_export_movements.md** - CSV movement audit log export
+### Database
 
-#### QA Phase
+- **Movement Log**: Immutable append-only log of every inventory change (ADD, REMOVE, TRANSFER, COUNT_ADJUSTMENT)
+- **Inventory Balance**: Computed view (SUM of movements) — not a separate mutable table
+- **Bin-Optional**: Warehouses have `use_bins` flag; bins only enforced if true
+- **Schema Evolution**: Use Drizzle generate → migrate workflow
 
-- **task_20260401_qa_warehouse.md** - 27 test scenarios (17 happy path + 10 error paths)
+### API Design
 
----
+- **Contract-First**: Zod schemas in routes → OpenAPI → frontend code gen
+- **Boundary Contracts**: Each flow specifies request/response data types in dfd_level0.md
+- **Role-Based Access**: Owner can override constraints; User performs operations only
+- **Error Classes**: Use `AppError` subclasses (ForbiddenError, NotFoundError, etc.)
 
-## Key Architectural Patterns
+### Frontend
 
-### Backend (Hono + Neon Postgres)
+- **Server State**: TanStack Query hooks in `src/hooks/queries/` (one per domain)
+- **Mutations**: Always invalidate query keys after successful mutation
+- **Client State**: Zustand for auth/user session (persisted to localStorage)
+- **Component Structure**: Pages fetch data → components receive props
 
-- Contract-first: Zod schemas → `/openapi.json` → frontend client generation
-- Movements: Append-only audit log; balance always computed via SUM aggregation
-- Authorization: Zod middleware, role-based checks via `requireRole(c, "owner")`
-- No N+1: JOIN-based queries with aggregation
+### Testing Strategy
 
-### Frontend (React SPA + TanStack Query)
+- **Backend**: Vitest integration tests vs Dockerized Postgres (port 5433)
+- **E2E**: Playwright in `warehouse-frontend/e2e/`
+- **Test Helpers**: `clearDatabase()`, `signupUser(role)` in `warehouse-backend/src/tests/helpers.ts`
 
-- One query hook per domain (`useItem`, `useItems`, `useWarehouseInventory`)
-- One mutation hook per command (`useAddMovement`, `useRemoveMovement`, etc.)
-- Optimistic updates on forms
-- Invalidation on mutations to keep cache fresh
+## Workflow Commands
 
-### Database Layout
+Standard Kanban verbs:
 
+- `@kanban /task <name>` — select task to work on
+- `plan` (`p`) — discuss and plan with DFD + requirements
+- `todo` (`t`) — create actionable checklist
+- `implement` (`i`) — write code per plan and checklist
+
+Examples: `p t i` = plan, then todo, then implement in one turn.
+
+## Dev Workflow (Reference)
+
+```bash
+# Setup
+make dev            # Docker (Postgres) + backend (:8788) + frontend (:5173)
+
+# After backend route/schema change
+cd warehouse-frontend && npm run generate-api
+
+# Database migrations
+npm run db:generate    # From schema.ts changes
+npm run db:migrate     # Apply to local
+npm run db:migrate:prod # Apply to production
+
+# Testing
+make test           # Vitest + Playwright (Docker)
+make test-e2e       # Playwright only
 ```
-warehouses (id, name, use_bins)
-items (id, name, description)
-item_barcodes (id, item_id, barcode UNIQUE)
-bins (id, warehouse_id, name)
-movements (id, type, item_id, user_id, source_warehouse_id, source_bin_id, dest_warehouse_id, dest_bin_id, qty, note, timestamp)
+
+## Common Patterns
+
+### Backend Route
+
+```typescript
+// warehouse-backend/src/routes/items.ts
+import { createRoute } from "@hono/zod-openapi";
+
+export const createItemRoute = createRoute({
+  method: "post",
+  path: "/items",
+  request: {
+    body: { content: { "application/json": { schema: CreateItemRequest } } },
+  },
+  response: {
+    201: { content: { "application/json": { schema: ItemResponse } } },
+  },
+  tags: ["Items"],
+});
+
+router.openapi(createItemRoute, async (c) => {
+  const { name, description, barcodes } = c.req.valid("json");
+  // Validate, insert, return 201
+});
 ```
 
-Movement types: `ADD`, `REMOVE`, `TRANSFER`, `COUNT_ADJUSTMENT`, `MANUAL_ADJUSTMENT`
+### Frontend Hook
 
-### Key Business Rules
+```typescript
+// warehouse-frontend/src/hooks/queries/useItems.ts
+export function useCreateItem() {
+  return useMutation({
+    mutationFn: (data) => client.items.createItem(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+    },
+  });
+}
+```
 
-1. Bins only exist if `warehouse.use_bins = true`
-2. Movements are immutable (append-only)
-3. Negative inventory allowed if Owner overrides
-4. Balance = SUM(movements) per (item, warehouse, bin)
-5. Barcodes are unique; one item can have many
+## Known Constraints / Future Work
 
----
-
-## Next Steps
-
-1. **Developer Pickup**: Agents start with DEV phase tasks in dependency order
-   - Core visibility (search + item detail)
-   - Core movements (add → remove → transfer → count)
-   - Admin (warehouses → items → bins)
-   - Exports
-
-2. **Test-First**: Write test cases from QA task before implementation
-
-3. **Deployment**:
-   - Backend: Cloudflare Pages Functions (wrangler deploy)
-   - Frontend: Cloudflare Pages (npm run build → deploy)
-   - DB Migrations: `npm run db:generate && npm run db:migrate`
-   - Frontend Client: `npm run generate-api` after backend changes
-
-4. **Signoff**: Family team user acceptance testing (barcode scanning, end-to-end flows)
+- **Async Owner Approval**: Task #7 (RemovalApprovals) has sync + async options; MVP uses sync modal
+- **Export Data**: Not in Phase 2; future enhancement
+- **Multi-user Sync**: Real-time updates not in Phase 2; polling via Query cache
+- **Notifications**: Owner alerts (removals, system events) placeholder for future
 
 ---
 
-## Important Notes
-
-- **Idempotency**: Movements tagged by (user, timestamp, item, source, qty) for duplicate prevention
-- **CSV Export**: Use Papa Parse or native CSV builder; proper escaping required
-- **Role Model**: Two roles: Owner (admin, override) + User (operations only)
-- **Audit Trail**: Every movement is immutable; history never deleted
-- **Scalability**: Two warehouses initially; design for adding more later
-
----
-
-## Reference Materials
-
-- **UserStories.md**: Raw requirements (7 epics, 12 user stories, 12 functional requirements)
-- **.github/copilot-instructions.md**: Full architectural patterns & pitfalls
-- **FRD.md** (if exists): Product functional design
+**Last updated**: 2026-04-04 — All 10 Phase 2 tasks created, ready for implementation ordering.

@@ -1,4 +1,5 @@
 lanes:
+  - backlog
   - todo
   - doing
   - done
@@ -10,3 +11,4 @@ labels:
   - flow-3-transfer-stock
   - flow-4-quick-count
   - inventory-visibility
+

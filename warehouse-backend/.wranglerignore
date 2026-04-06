@@ -1,0 +1,64 @@
+# Wrangler build artifacts
+
+.wrangler
+
+# Dependencies (handled by bundler)
+
+node_modules
+
+# Version control
+
+.git
+.gitignore
+
+# OS files
+
+.DS_Store
+\*.log
+
+# Environment files
+
+.env
+.env._
+.dev.vars
+.dev.vars._
+
+# Documentation
+
+\*.md
+README.md
+copilot-summries/
+
+# Database files
+
+drizzle/
+\*.sql
+drizzle.config.ts
+
+# Test files
+
+_.test.ts
+vitest.config.ts
+test-notification-logic.ts
+src/tests/
+src/scripts/seed_.ts
+
+# Build configs
+
+tsconfig.json
+package.json
+package-lock.json
+
+# Setup/utility scripts
+
+setup.sh
+set-db-localtest-me.sh
+run-tests.sh
+
+# Scheduler (separate deployment)
+
+wrangler.scheduler.toml
+
+# Better Auth schema (not needed at runtime)
+
+better-auth-schema.ts

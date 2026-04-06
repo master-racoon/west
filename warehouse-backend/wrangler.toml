@@ -1,0 +1,46 @@
+name = "warehouse-backend"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "."
+
+# Enable Node.js compatibility for BetterAuth
+compatibility_flags = ["nodejs_compat"]
+
+# R2 Bucket binding for video storage
+[[r2_buckets]]
+binding = "VIDEOS_BUCKET"
+bucket_name = "warehouse-videos"
+
+# TODO: Enable Email Service after being admitted to Cloudflare Email Service
+# Send Email binding for transactional emails
+# [[send_email]]
+# name = "EMAIL"
+# destination_address = "*"
+
+# Hyperdrive binding for Neon Postgres
+# Configure this after creating a Hyperdrive config via Cloudflare dashboard or CLI
+# [[hyperdrive]]
+# binding = "DB"
+# id = "your-hyperdrive-id"
+
+# Alternative: Use Neon serverless driver directly with DATABASE_URL secret
+# Set DATABASE_URL as a secret: wrangler secret put DATABASE_URL
+
+# KV namespace for session storage (optional, if BetterAuth needs it)
+# [[kv_namespaces]]
+# binding = "SESSION_KV"
+# id = "your-kv-namespace-id"
+
+[vars]
+BETTER_AUTH_URL = "https://api.warehouse.com"
+FRONTEND_URL = "https://warehouse.com"
+FROM_EMAIL = "noreply@warehouse.com"
+
+# Secrets (set via: wrangler secret put SECRET_NAME)
+# - BETTER_AUTH_SECRET
+# - DATABASE_URL (Neon connection string)
+# - RESEND_API_KEY (for email sending)
+# - GOOGLE_CLIENT_ID (optional OAuth)
+# - GOOGLE_CLIENT_SECRET (optional OAuth)
+
+[limits]
+cpu_ms = 300_000
