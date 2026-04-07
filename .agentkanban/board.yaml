@@ -11,4 +11,4 @@ labels:
   - flow-3-transfer-stock
   - flow-4-quick-count
   - inventory-visibility
-
+  - platform-auth

@@ -3,8 +3,22 @@ import { ForbiddenError, UnauthorizedError } from "../utils/errors";
 
 export interface AuthUser {
   id: string;
-  email: string;
+  email?: string;
   role: "owner" | "user";
+}
+
+export type SessionUser = Pick<AuthUser, "id" | "role">;
+
+// In-memory session store (lives within a single Cloudflare Worker isolate)
+export const sessions = new Map<string, SessionUser>();
+
+export function getSession(c: Context): SessionUser | null {
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+  const token = authHeader.slice(7);
+  return sessions.get(token) ?? null;
 }
 
 export function getAuth(c: Context): AuthUser | null {

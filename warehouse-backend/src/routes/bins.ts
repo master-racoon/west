@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { bin, warehouse } from "../db/schema";
 import { requireRole, requireAuth } from "../authorization/middleware";
 import { ConflictError, BadRequestError, NotFoundError } from "../utils/errors";
 
-const router = new Hono();
+const router = new Hono<{ Variables: { db: any; auth: any } }>();
 
 // Zod schemas
 export const CreateBinRequest = z.object({
@@ -65,7 +65,7 @@ router.post("/", async (c) => {
       and(
         eq(bin.warehouse_id, data.warehouse_id),
         // Case-insensitive comparison
-        eq(db.sql`LOWER(${bin.name})`, data.name.toLowerCase()),
+        eq(sql`LOWER(${bin.name})`, data.name.toLowerCase()),
       ),
     )
     .limit(1);

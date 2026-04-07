@@ -19,6 +19,14 @@ help:
 	@echo "  make deploy-scheduler - Deploy scheduler Worker only"
 	@echo "  make deploy-frontend  - Deploy frontend only"
 
+#install all services
+i: 
+	@echo "Installing all packages"
+	@cd warehouse-backend && npm i
+	@sleep 3 & cd ..
+	@cd warehouse-frontend && npm i
+	@echo "All services installed!"
+
 # Start all services in correct order
 dev:
 	@echo "Starting docker-compose..."

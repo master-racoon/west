@@ -4,10 +4,13 @@ import { createDbClient } from "./db";
 import { AppError } from "./utils/errors";
 import warehouseRoutes from "./routes/warehouses";
 import binsRoutes from "./routes/bins";
+import authRoutes from "./routes/auth";
 
 interface Bindings {
   DATABASE_URL?: string;
   BETTER_AUTH_SECRET?: string;
+  APP_PASSWORD?: string;
+  FRONTEND_URL?: string;
 }
 
 interface Variables {
@@ -38,7 +41,7 @@ app.use("*", async (c, next) => {
   c.header("Access-Control-Allow-Credentials", "true");
 
   if (c.req.method === "OPTIONS") {
-    return c.text("", 204);
+    return c.text("", 204 as any);
   }
 
   await next();
@@ -72,13 +75,14 @@ app.onError((err, c) => {
   console.error("Error:", err);
 
   if (err instanceof AppError) {
-    return c.json({ error: err.message }, err.statusCode);
+    return c.json({ error: err.message }, err.statusCode as any);
   }
 
   return c.json({ error: "Internal server error" }, 500);
 });
 
 // Routes
+app.route("/api/auth", authRoutes);
 app.route("/api/warehouses", warehouseRoutes);
 app.route("/api/bins", binsRoutes);
 app.route("/api/warehouses", binsRoutes);

@@ -10,3 +10,16 @@ Read `.agentkanban/INSTRUCTION.md` for task workflow rules.
 Read `.agentkanban/memory.md` for project context.
 IMPORTANT: ALWAYS respond in and at the end of the task file.
 <!-- END AGENT KANBAN -->
+
+
+## Self-improvement
+When the user uses strong language, you need to save the solutions you have attempted in `west/MEMORY.md`
+
+
+## runSubagent — MUST pass agentName
+
+When delegating to an agent, use `agentName: "NAME"` parameter explicitly. Without it, a generic agent spawns that lacks its intended tools. This was the cause of repeated delegation failures.
+
+```
+runSubagent(agentName: "build", description: "short label", prompt: "...")
+```

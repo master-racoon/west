@@ -5,7 +5,7 @@ import { warehouse } from "../db/schema";
 import { requireRole } from "../authorization/middleware";
 import { ConflictError, BadRequestError } from "../utils/errors";
 
-const router = new Hono();
+const router = new Hono<{ Variables: { db: any; auth: any } }>();
 
 // Zod schemas
 export const CreateWarehouseRequest = z.object({
