@@ -1,34 +1,89 @@
-import { useState, KeyboardEvent } from "react";
+import { useState, useEffect, KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
+
+interface UserName {
+  id: string;
+  name: string;
+}
 
 export function LoginPage() {
+  const [mode, setMode] = useState<"user" | "owner">("user");
+  const [userId, setUserId] = useState("");
+  const [pin, setPin] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userNames, setUserNames] = useState<UserName[]>([]);
+  const [namesLoading, setNamesLoading] = useState(false);
   const navigate = useNavigate();
+  const { setUser, setToken } = useAuthStore();
+
+  // Fetch user names when mount or switch to user mode
+  const fetchUserNames = async () => {
+    setNamesLoading(true);
+    try {
+      const res = await fetch("/api/users/names");
+      if (res.ok) {
+        const data = await res.json();
+        setUserNames(data);
+      }
+    } finally {
+      setNamesLoading(false);
+    }
+  };
+
+  // Fetch user names on mount (user mode is default)
+  useEffect(() => {
+    fetchUserNames();
+  }, []);
 
   const handleLogin = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
+      let body: Record<string, string>;
+      if (mode === "owner") {
+        body = { password };
+      } else {
+        if (!userId) {
+          setError("Please select your name.");
+          return;
+        }
+        if (!/^\d{4}$/.test(pin)) {
+          setError("PIN must be exactly 4 digits.");
+          return;
+        }
+        body = { user_id: userId, pin };
+      }
+
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(body),
       });
 
-      if (response.status === 401) {
-        setError("Invalid password. Try again.");
+      if (response.status === 423) {
+        setError("Account locked. Try again later.");
         return;
       }
-
+      if (response.status === 401) {
+        setError(
+          mode === "owner"
+            ? "Invalid password. Try again."
+            : "Invalid PIN. Try again.",
+        );
+        return;
+      }
       if (!response.ok) {
         setError("Login failed. Please try again.");
         return;
       }
 
       const data = await response.json();
+      setToken(data.session_token);
+      setUser(data.user);
       localStorage.setItem("session_token", data.session_token);
       navigate("/dashboard");
     } catch {
@@ -39,9 +94,19 @@ export function LoginPage() {
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleLogin();
-    }
+    if (e.key === "Enter") handleLogin();
+  };
+
+  const toggleMode = () => {
+    setMode((m) => {
+      const next = m === "user" ? "owner" : "user";
+      if (next === "user") fetchUserNames();
+      return next;
+    });
+    setError(null);
+    setPin("");
+    setPassword("");
+    setUserId("");
   };
 
   return (
@@ -56,22 +121,69 @@ export function LoginPage() {
       }}
     >
       <h1>Warehouse Login</h1>
-      <input
-        type="password"
-        placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={isLoading}
-        style={{ padding: "8px", width: "240px" }}
-      />
+
+      {mode === "user" ? (
+        <>
+          <select
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            disabled={isLoading || namesLoading}
+            style={{ padding: "8px", width: "240px" }}
+          >
+            <option value="">Select your name</option>
+            {userNames.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="4-digit PIN"
+            value={pin}
+            onChange={(e) =>
+              setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+            }
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+            maxLength={4}
+            inputMode="numeric"
+            style={{ padding: "8px", width: "240px" }}
+          />
+        </>
+      ) : (
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isLoading}
+          style={{ padding: "8px", width: "240px" }}
+        />
+      )}
+
       {error && <div style={{ color: "red" }}>{error}</div>}
+
       <button
         onClick={handleLogin}
         disabled={isLoading}
         style={{ padding: "8px 24px" }}
       >
         {isLoading ? "Logging in…" : "Login"}
+      </button>
+
+      <button
+        onClick={toggleMode}
+        style={{
+          background: "none",
+          border: "none",
+          color: "#1a73e8",
+          cursor: "pointer",
+          fontSize: "14px",
+        }}
+      >
+        {mode === "user" ? "Login as owner" : "Back to PIN login"}
       </button>
     </div>
   );

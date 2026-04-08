@@ -7,7 +7,11 @@ export interface AuthUser {
   role: "owner" | "user";
 }
 
-export type SessionUser = Pick<AuthUser, "id" | "role">;
+export type SessionUser = {
+  id: string;
+  role: "owner" | "user";
+  name?: string;
+};
 
 // In-memory session store (lives within a single Cloudflare Worker isolate)
 export const sessions = new Map<string, SessionUser>();

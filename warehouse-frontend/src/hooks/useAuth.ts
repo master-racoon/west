@@ -9,7 +9,10 @@ async function fetchSession() {
   });
   if (!response.ok) throw new Error("Failed to fetch session");
   return response.json() as Promise<
-    | { authenticated: true; user: { id: string; role: "owner" | "user" } }
+    | {
+        authenticated: true;
+        user: { id: string; name?: string; role: "owner" | "user" };
+      }
     | { authenticated: false }
   >;
 }

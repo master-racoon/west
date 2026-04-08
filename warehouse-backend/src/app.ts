@@ -5,6 +5,7 @@ import { AppError } from "./utils/errors";
 import warehouseRoutes from "./routes/warehouses";
 import binsRoutes from "./routes/bins";
 import authRoutes from "./routes/auth";
+import usersRoutes from "./routes/users";
 
 interface Bindings {
   DATABASE_URL?: string;
@@ -83,6 +84,7 @@ app.onError((err, c) => {
 
 // Routes
 app.route("/api/auth", authRoutes);
+app.route("/api/users", usersRoutes);
 app.route("/api/warehouses", warehouseRoutes);
 app.route("/api/bins", binsRoutes);
 app.route("/api/warehouses", binsRoutes);

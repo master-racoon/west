@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-0.1 Access Password-Protected App Shell with Domain Side Menu"
-lane: todo
+lane: doing
 created: 2026-04-07T00:00:00Z
-updated: 2026-04-07T00:00:00Z
+updated: 2026-04-08T11:26:43.976Z
 description: Platform scaffold—authenticated app layout with persistent side menu for domain features
 labels:
   - platform-auth
-sortOrder: 0
+sortOrder: 1
 slug: appshell_login
 ---
 

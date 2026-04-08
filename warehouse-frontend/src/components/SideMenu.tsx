@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
 
 const navItems = [
   { label: "Configuration", to: "/dashboard/configuration" },
@@ -9,7 +10,26 @@ const navItems = [
   { label: "Inventory Visibility", to: "/dashboard/inventory" },
 ];
 
+function NavItem({ to, label }: { to: string; label: string }) {
+  return (
+    <NavLink
+      to={to}
+      style={({ isActive }: { isActive: boolean }) => ({
+        padding: "10px 24px",
+        textDecoration: "none",
+        color: isActive ? "#1a73e8" : "#333",
+        backgroundColor: isActive ? "#e8f0fe" : "transparent",
+        fontWeight: isActive ? 600 : 400,
+      })}
+    >
+      {label}
+    </NavLink>
+  );
+}
+
 export function SideMenu() {
+  const { user } = useAuthStore();
+
   return (
     <nav
       style={{
@@ -22,20 +42,11 @@ export function SideMenu() {
         gap: "4px",
       }}
     >
+      {user?.role === "owner" && (
+        <NavItem to="/dashboard/users" label="Users" />
+      )}
       {navItems.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          style={({ isActive }: { isActive: boolean }) => ({
-            padding: "10px 24px",
-            textDecoration: "none",
-            color: isActive ? "#1a73e8" : "#333",
-            backgroundColor: isActive ? "#e8f0fe" : "transparent",
-            fontWeight: isActive ? 600 : 400,
-          })}
-        >
-          {item.label}
-        </NavLink>
+        <NavItem key={item.to} to={item.to} label={item.label} />
       ))}
     </nav>
   );

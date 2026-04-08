@@ -2,7 +2,7 @@
 title: "[DEV] US-0.2 PIN-Based Multi-User Auth with Owner User Management"
 lane: todo
 created: 2026-04-08T00:00:00Z
-updated: 2026-04-08T00:00:00Z
+updated: 2026-04-08T11:28:29.522Z
 description: Add a users table and 4-digit PIN login for regular users. Owner login remains env-based (APP_PASSWORD). Owner can create, list, delete users, reset their PINs, and unlock accounts via /api/users endpoints and a UsersPage in the frontend.
 labels:
   - platform-auth

@@ -6,6 +6,8 @@ import {
   varchar,
   uniqueIndex,
   foreignKey,
+  integer,
+  text,
 } from "drizzle-orm/pg-core";
 
 export const warehouse = pgTable("warehouse", {
@@ -36,3 +38,13 @@ export const bin = pgTable(
     ),
   }),
 );
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  pin_hash: text("pin_hash").notNull(),
+  failed_attempts: integer("failed_attempts").notNull().default(0),
+  locked_until: timestamp("locked_until"),
+  role: text("role").notNull().default("user"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});

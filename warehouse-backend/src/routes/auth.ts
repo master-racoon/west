@@ -1,13 +1,26 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { compare } from "bcryptjs";
 import { sessions } from "../authorization/middleware";
+import { users } from "../db/schema";
 
-const router = new Hono<{ Bindings: { APP_PASSWORD?: string } }>();
+const router = new Hono<{
+  Bindings: { APP_PASSWORD?: string; DATABASE_URL?: string };
+  Variables: { db: any };
+}>();
 
 // Zod schemas
-export const LoginRequest = z.object({
+const OwnerLoginRequest = z.object({
   password: z.string().min(8).max(100),
 });
+
+const UserLoginRequest = z.object({
+  user_id: z.string().uuid(),
+  pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
+});
+
+const LoginRequest = z.union([OwnerLoginRequest, UserLoginRequest]);
 
 export const LoginResponse = z.object({
   session_token: z.string(),
@@ -37,18 +50,62 @@ router.post("/login", async (c) => {
     return c.json({ error: "Invalid request" }, 400);
   }
 
-  const { password } = parsed.data;
-  const appPassword = c.env?.APP_PASSWORD;
-
-  if (!appPassword || password !== appPassword) {
-    return c.json({ error: "Invalid password" }, 401);
+  // Owner password login
+  if ("password" in parsed.data) {
+    const appPassword = c.env?.APP_PASSWORD;
+    if (!appPassword || parsed.data.password !== appPassword) {
+      return c.json({ error: "Invalid password" }, 401);
+    }
+    const token = crypto.randomUUID();
+    const user = { id: "owner-user", role: "owner" as const, name: "Owner" };
+    sessions.set(token, user);
+    return c.json({
+      session_token: token,
+      user: { id: "owner-user", name: "Owner", role: "owner" },
+    });
   }
 
-  const token = crypto.randomUUID();
-  const user = { id: "owner-user", role: "owner" as const };
-  sessions.set(token, user);
+  // User PIN login
+  const db = c.get("db");
+  const { user_id, pin } = parsed.data;
 
-  return c.json({ session_token: token, user });
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, user_id))
+    .limit(1);
+  if (!user) {
+    return c.json({ error: "Invalid credentials" }, 401);
+  }
+
+  if (user.locked_until && user.locked_until > new Date()) {
+    return c.json({ error: "Account locked. Try again later." }, 423);
+  }
+
+  const match = await compare(pin, user.pin_hash);
+  if (!match) {
+    const newAttempts = user.failed_attempts + 1;
+    const updatePayload: Record<string, unknown> = {
+      failed_attempts: newAttempts,
+    };
+    if (newAttempts >= 5) {
+      updatePayload.locked_until = new Date(Date.now() + 15 * 60 * 1000);
+    }
+    await db.update(users).set(updatePayload).where(eq(users.id, user_id));
+    return c.json({ error: "Invalid credentials" }, 401);
+  }
+
+  await db
+    .update(users)
+    .set({ failed_attempts: 0, locked_until: null })
+    .where(eq(users.id, user_id));
+  const token = crypto.randomUUID();
+  const sessionUser = { id: user.id, role: "user" as const, name: user.name };
+  sessions.set(token, sessionUser);
+  return c.json({
+    session_token: token,
+    user: { id: user.id, name: user.name, role: "user" },
+  });
 });
 
 // GET /api/auth/session (public)
