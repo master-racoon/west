@@ -4,10 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "deploy": "vite build && npx wrangler pages deploy dist --branch=main",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit",
-    "generate-api": "echo 'API client auto-generation would happen here'",
+    "type-check": "tsgo --noEmit --incremental",
+    "generate-api:live": "openapi --input http://127.0.0.1:8788/openapi.json --output src/generated-api --name WarehouseClient --useOptions --useUnionTypes",
+    "generate-api": "cd ../warehouse-backend && npm run openapi:export && cd ../warehouse-frontend && openapi --input ../warehouse-backend/openapi.json --output src/generated-api --name WarehouseClient --useOptions --useUnionTypes",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -20,9 +22,14 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
+    "@types/node": "^25.5.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@typescript/native-preview": "latest",
     "@vitejs/plugin-react": "^4.2.0",
+    "openapi-typescript-codegen": "^0.29.0",
+    "oxfmt": "latest",
+    "oxlint": "latest",
     "playwright": "^1.40.0",
     "rollup-plugin-visualizer": "^5.10.0",
     "typescript": "^5.3.0",

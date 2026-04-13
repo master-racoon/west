@@ -1,9 +1,10 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { swaggerUI } from "@hono/swagger-ui";
 import { logger } from "hono/logger";
 import { createDbClient } from "./db";
 import { AppError } from "./utils/errors";
 import warehouseRoutes from "./routes/warehouses";
-import binsRoutes from "./routes/bins";
+import binsRoutes, { warehouseBinsRouter } from "./routes/bins";
 import authRoutes from "./routes/auth";
 import usersRoutes from "./routes/users";
 
@@ -19,7 +20,24 @@ interface Variables {
   auth?: any;
 }
 
+export const openApiDocumentConfig = {
+  openapi: "3.1.0",
+  info: {
+    title: "Warehouse API",
+    version: "1.0.0",
+    description: "API for warehouses, bins, users, and authentication",
+  },
+  servers: [
+    {
+      url: "http://127.0.0.1:8788",
+      description: "Local development server",
+    },
+  ],
+};
+
 const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>();
+
+app.doc("/openapi.json", openApiDocumentConfig);
 
 // Global middleware
 app.use("*", logger());
@@ -87,11 +105,13 @@ app.route("/api/auth", authRoutes);
 app.route("/api/users", usersRoutes);
 app.route("/api/warehouses", warehouseRoutes);
 app.route("/api/bins", binsRoutes);
-app.route("/api/warehouses", binsRoutes);
+app.route("/api/warehouses", warehouseBinsRouter);
 
 // Health check
 app.get("/health", (c) => {
   return c.json({ status: "ok" });
 });
+
+app.get("/doc", swaggerUI({ url: "/openapi.json" }));
 
 export default app;

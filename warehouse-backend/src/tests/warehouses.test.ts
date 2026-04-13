@@ -2,6 +2,25 @@ import { describe, it, expect, beforeEach } from "vitest";
 import app from "../app";
 import { clearDatabase, signupUser } from "./helpers";
 
+const makeRequest = (
+  method: string,
+  path: string,
+  options?: { body?: string; headers?: Record<string, string> },
+) => {
+  const url = `http://localhost${path}`;
+  const headers = options?.headers || {};
+  if (options?.body) {
+    headers["Content-Type"] = "application/json";
+  }
+  return app.request(
+    new Request(url, {
+      method,
+      body: options?.body,
+      headers,
+    }),
+  );
+};
+
 describe("Warehouse Routes", () => {
   beforeEach(async () => {
     await clearDatabase();
@@ -11,7 +30,7 @@ describe("Warehouse Routes", () => {
     it("should create a warehouse with valid data (owner)", async () => {
       const owner = await signupUser("owner");
 
-      const res = await app.request("POST", "/api/warehouses", {
+      const res = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "Main Warehouse",
           use_bins: true,
@@ -19,7 +38,7 @@ describe("Warehouse Routes", () => {
       });
 
       expect(res.status).toBe(201);
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, unknown>;
       expect(data).toHaveProperty("id");
       expect(data.name).toBe("Main Warehouse");
       expect(data.use_bins).toBe(true);
@@ -29,7 +48,7 @@ describe("Warehouse Routes", () => {
     it("should reject non-owner users with 403", async () => {
       const user = await signupUser("user");
 
-      const res = await app.request("POST", "/api/warehouses", {
+      const res = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "Another Warehouse",
           use_bins: false,
@@ -44,7 +63,7 @@ describe("Warehouse Routes", () => {
       const owner = await signupUser("owner");
 
       // First warehouse
-      const res1 = await app.request("POST", "/api/warehouses", {
+      const res1 = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "Duplicate Test",
           use_bins: false,
@@ -53,7 +72,7 @@ describe("Warehouse Routes", () => {
       expect(res1.status).toBe(201);
 
       // Duplicate name
-      const res2 = await app.request("POST", "/api/warehouses", {
+      const res2 = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "Duplicate Test",
           use_bins: true,
@@ -68,7 +87,7 @@ describe("Warehouse Routes", () => {
       const owner = await signupUser("owner");
 
       // First warehouse
-      const res1 = await app.request("POST", "/api/warehouses", {
+      const res1 = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "Warehouse A",
           use_bins: false,
@@ -77,7 +96,7 @@ describe("Warehouse Routes", () => {
       expect(res1.status).toBe(201);
 
       // Same name different case
-      const res2 = await app.request("POST", "/api/warehouses", {
+      const res2 = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "warehouse a",
           use_bins: false,
@@ -91,7 +110,7 @@ describe("Warehouse Routes", () => {
       const owner = await signupUser("owner");
 
       // 1 character
-      const res1 = await app.request("POST", "/api/warehouses", {
+      const res1 = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "A",
           use_bins: false,
@@ -101,7 +120,7 @@ describe("Warehouse Routes", () => {
 
       // 100 characters
       const longName = "A".repeat(100);
-      const res2 = await app.request("POST", "/api/warehouses", {
+      const res2 = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: longName,
           use_bins: false,
@@ -114,7 +133,7 @@ describe("Warehouse Routes", () => {
       const owner = await signupUser("owner");
 
       // Empty name
-      const res = await app.request("POST", "/api/warehouses", {
+      const res = await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "",
           use_bins: false,
@@ -127,10 +146,10 @@ describe("Warehouse Routes", () => {
 
   describe("GET /api/warehouses", () => {
     it("should list all warehouses", async () => {
-      const res = await app.request("GET", "/api/warehouses");
+      const res = await makeRequest("GET", "/api/warehouses");
 
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, unknown>[];
       expect(Array.isArray(data)).toBe(true);
     });
 
@@ -138,16 +157,16 @@ describe("Warehouse Routes", () => {
       const owner = await signupUser("owner");
 
       // Create warehouses
-      await app.request("POST", "/api/warehouses", {
+      await makeRequest("POST", "/api/warehouses", {
         body: JSON.stringify({
           name: "Warehouse 1",
           use_bins: true,
         }),
       });
 
-      const res = await app.request("GET", "/api/warehouses");
+      const res = await makeRequest("GET", "/api/warehouses");
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, unknown>[];
 
       // Should have metadata fields
       if (data.length > 0) {

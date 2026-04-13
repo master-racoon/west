@@ -1,14 +1,17 @@
-import { Hono } from "hono";
-import { z } from "zod";
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
 import { compare } from "bcryptjs";
-import { sessions } from "../authorization/middleware";
+import { sessions, type SessionUser } from "../authorization/middleware";
 import { users } from "../db/schema";
 
-const router = new Hono<{
+const router = new OpenAPIHono<{
   Bindings: { APP_PASSWORD?: string; DATABASE_URL?: string };
   Variables: { db: any };
 }>();
+
+const ErrorResponse = z.object({
+  error: z.string(),
+});
 
 // Zod schemas
 const OwnerLoginRequest = z.object({
@@ -26,6 +29,7 @@ export const LoginResponse = z.object({
   session_token: z.string(),
   user: z.object({
     id: z.string(),
+    name: z.string(),
     role: z.enum(["owner", "user"]),
   }),
 });
@@ -33,7 +37,11 @@ export const LoginResponse = z.object({
 export const SessionResponse = z.union([
   z.object({
     authenticated: z.literal(true),
-    user: z.object({ id: z.string(), role: z.enum(["owner", "user"]) }),
+    user: z.object({
+      id: z.string(),
+      name: z.string(),
+      role: z.enum(["owner", "user"]),
+    }),
   }),
   z.object({ authenticated: z.literal(false) }),
 ]);
@@ -42,32 +50,134 @@ export const LogoutResponse = z.object({
   success: z.boolean(),
 });
 
+function toSessionResponseUser(user: SessionUser): {
+  id: string;
+  name: string;
+  role: "owner" | "user";
+} {
+  return {
+    id: user.id,
+    name: user.name ?? "Unknown",
+    role: user.role,
+  };
+}
+
+const loginRoute = createRoute({
+  method: "post",
+  path: "/login",
+  tags: ["Auth"],
+  operationId: "login",
+  summary: "Create a session",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: LoginRequest,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Authenticated",
+      content: {
+        "application/json": {
+          schema: LoginResponse,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    401: {
+      description: "Invalid credentials",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    423: {
+      description: "Account locked",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const getSessionRoute = createRoute({
+  method: "get",
+  path: "/session",
+  tags: ["Auth"],
+  operationId: "getSession",
+  summary: "Read the current session",
+  responses: {
+    200: {
+      description: "Current session",
+      content: {
+        "application/json": {
+          schema: SessionResponse,
+        },
+      },
+    },
+  },
+});
+
+const logoutRoute = createRoute({
+  method: "post",
+  path: "/logout",
+  tags: ["Auth"],
+  operationId: "logout",
+  summary: "Clear the current session",
+  responses: {
+    200: {
+      description: "Logged out",
+      content: {
+        "application/json": {
+          schema: LogoutResponse,
+        },
+      },
+    },
+  },
+});
+
 // POST /api/auth/login (public)
-router.post("/login", async (c) => {
-  const body = await c.req.json();
-  const parsed = LoginRequest.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "Invalid request" }, 400);
-  }
+router.openapi(loginRoute, async (c) => {
+  const parsed = c.req.valid("json");
 
   // Owner password login
-  if ("password" in parsed.data) {
+  if ("password" in parsed) {
     const appPassword = c.env?.APP_PASSWORD;
-    if (!appPassword || parsed.data.password !== appPassword) {
+    if (!appPassword || parsed.password !== appPassword) {
       return c.json({ error: "Invalid password" }, 401);
     }
     const token = crypto.randomUUID();
-    const user = { id: "owner-user", role: "owner" as const, name: "Owner" };
+    const user: SessionUser = {
+      id: "owner-user",
+      role: "owner",
+      name: "Owner",
+    };
     sessions.set(token, user);
-    return c.json({
-      session_token: token,
-      user: { id: "owner-user", name: "Owner", role: "owner" },
-    });
+    return c.json(
+      {
+        session_token: token,
+        user: toSessionResponseUser(user),
+      },
+      200,
+    );
   }
 
   // User PIN login
   const db = c.get("db");
-  const { user_id, pin } = parsed.data;
+  const { user_id, pin } = parsed;
 
   const [user] = await db
     .select()
@@ -100,39 +210,49 @@ router.post("/login", async (c) => {
     .set({ failed_attempts: 0, locked_until: null })
     .where(eq(users.id, user_id));
   const token = crypto.randomUUID();
-  const sessionUser = { id: user.id, role: "user" as const, name: user.name };
+  const sessionUser: SessionUser = {
+    id: user.id,
+    role: "user",
+    name: user.name,
+  };
   sessions.set(token, sessionUser);
-  return c.json({
-    session_token: token,
-    user: { id: user.id, name: user.name, role: "user" },
-  });
+  return c.json(
+    {
+      session_token: token,
+      user: toSessionResponseUser(sessionUser),
+    },
+    200,
+  );
 });
 
 // GET /api/auth/session (public)
-router.get("/session", async (c) => {
+router.openapi(getSessionRoute, async (c) => {
   const authHeader = c.req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return c.json({ authenticated: false });
+    return c.json({ authenticated: false }, 200);
   }
 
   const token = authHeader.slice(7);
   const user = sessions.get(token);
 
   if (!user) {
-    return c.json({ authenticated: false });
+    return c.json({ authenticated: false }, 200);
   }
 
-  return c.json({ authenticated: true, user });
+  return c.json(
+    { authenticated: true, user: toSessionResponseUser(user) },
+    200,
+  );
 });
 
 // POST /api/auth/logout
-router.post("/logout", async (c) => {
+router.openapi(logoutRoute, async (c) => {
   const authHeader = c.req.header("Authorization");
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
     sessions.delete(token);
   }
-  return c.json({ success: true });
+  return c.json({ success: true }, 200);
 });
 
 export default router;

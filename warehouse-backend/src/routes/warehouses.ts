@@ -1,11 +1,14 @@
-import { Hono } from "hono";
-import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
+import { eq, sql } from "drizzle-orm";
 import { warehouse } from "../db/schema";
 import { requireRole } from "../authorization/middleware";
 import { ConflictError, BadRequestError } from "../utils/errors";
 
-const router = new Hono<{ Variables: { db: any; auth: any } }>();
+const router = new OpenAPIHono<{ Variables: { db: any; auth: any } }>();
+
+const ErrorResponse = z.object({
+  error: z.string(),
+});
 
 // Zod schemas
 export const CreateWarehouseRequest = z.object({
@@ -24,21 +27,101 @@ export const WarehouseResponse = z.object({
 
 export type WarehouseResponse = z.infer<typeof WarehouseResponse>;
 
+const ListWarehousesResponse = z.array(WarehouseResponse);
+
+const createWarehouseRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["Warehouses"],
+  operationId: "createWarehouse",
+  summary: "Create a warehouse",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: CreateWarehouseRequest,
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      description: "Warehouse created",
+      content: {
+        "application/json": {
+          schema: WarehouseResponse,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    403: {
+      description: "Owner role required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    409: {
+      description: "Warehouse already exists",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const listWarehousesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["Warehouses"],
+  operationId: "getWarehouses",
+  summary: "List warehouses",
+  responses: {
+    200: {
+      description: "Warehouse list",
+      content: {
+        "application/json": {
+          schema: ListWarehousesResponse,
+        },
+      },
+    },
+  },
+});
+
+function toWarehouseResponse(record: {
+  id: string;
+  name: string;
+  use_bins: boolean;
+  created_at: Date;
+}): WarehouseResponse {
+  return {
+    id: record.id,
+    name: record.name,
+    use_bins: record.use_bins,
+    created_at: record.created_at.toISOString(),
+  };
+}
+
 // POST /api/warehouses - Create a new warehouse
-router.post("/", async (c) => {
+router.openapi(createWarehouseRoute, async (c) => {
   // Require owner role
   requireRole(c, "owner");
 
-  const body = await c.req.json();
-
-  // Validate input
-  const parsed = CreateWarehouseRequest.safeParse(body);
-  if (!parsed.success) {
+  const data = c.req.valid("json");
+  const normalizedName = data.name.trim().toLowerCase();
+  if (!normalizedName) {
     throw new BadRequestError("Invalid request");
   }
-
-  const data = parsed.data;
-  const normalizedName = data.name.toLowerCase();
 
   // Get database client
   const db = c.get("db");
@@ -47,7 +130,7 @@ router.post("/", async (c) => {
   const existing = await db
     .select()
     .from(warehouse)
-    .where(eq(warehouse.name, normalizedName))
+    .where(eq(sql`LOWER(${warehouse.name})`, normalizedName))
     .limit(1);
 
   if (existing.length > 0) {
@@ -58,7 +141,7 @@ router.post("/", async (c) => {
   const result = await db
     .insert(warehouse)
     .values({
-      name: normalizedName,
+      name: data.name.trim(),
       use_bins: data.use_bins,
     })
     .returning({
@@ -72,11 +155,11 @@ router.post("/", async (c) => {
     throw new Error("Failed to create warehouse");
   }
 
-  return c.json(result[0], 201);
+  return c.json(toWarehouseResponse(result[0]), 201);
 });
 
 // GET /api/warehouses - List all warehouses
-router.get("/", async (c) => {
+router.openapi(listWarehousesRoute, async (c) => {
   const db = c.get("db");
 
   const warehouses = await db
@@ -89,7 +172,7 @@ router.get("/", async (c) => {
     .from(warehouse)
     .orderBy(warehouse.created_at);
 
-  return c.json(warehouses);
+  return c.json(warehouses.map(toWarehouseResponse));
 });
 
 export default router;

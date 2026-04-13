@@ -1,20 +1,23 @@
 <!-- BEGIN AGENT KANBAN — DO NOT EDIT THIS SECTION -->
+
 ## Agent Kanban
 
-**Active Task:** [DEV] US-1.1 Define Warehouse with Bin Mode
-**Task File:** `west/.agentkanban/tasks/task_20260404_01_flow5_define_warehouse.md`
-**Todo File:** `west/.agentkanban/tasks/todo_20260404_01_flow5_define_warehouse.md`
+**Active Task:**
+**Task File:**
+**Todo File:**
 
 Read the task file above before responding.
 Read `.agentkanban/INSTRUCTION.md` for task workflow rules.
 Read `.agentkanban/memory.md` for project context.
 IMPORTANT: ALWAYS respond in and at the end of the task file.
+
 <!-- END AGENT KANBAN -->
 
+> **Scope guard** — The Agent Kanban instructions above (read task file, respond in task file) apply to the **default Copilot agent only**. If you are a specialized agent (`healer`, `build`, `plan`, `execute`, `qa`), **ignore the Agent Kanban section entirely** and follow only your own `.agent.md` file.
 
 ## Self-improvement
-When the user uses strong language, you need to save the solutions you have attempted in `west/MEMORY.md`
 
+When the user uses strong language, you need to save the solutions you have attempted in `west/MEMORY.md`
 
 ## runSubagent — MUST pass agentName
 

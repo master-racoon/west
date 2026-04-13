@@ -1,11 +1,25 @@
-import { Hono } from "hono";
-import { z } from "zod";
+import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq, and, sql } from "drizzle-orm";
 import { bin, warehouse } from "../db/schema";
 import { requireRole, requireAuth } from "../authorization/middleware";
 import { ConflictError, BadRequestError, NotFoundError } from "../utils/errors";
 
-const router = new Hono<{ Variables: { db: any; auth: any } }>();
+const binsRouter = new OpenAPIHono<{ Variables: { db: any; auth: any } }>();
+const warehouseBinsRouter = new OpenAPIHono<{
+  Variables: { db: any; auth: any };
+}>();
+
+const ErrorResponse = z.object({
+  error: z.string(),
+});
+
+const IdParams = z.object({
+  id: z.string().uuid(),
+});
+
+const WarehouseIdParams = z.object({
+  warehouse_id: z.string().uuid(),
+});
 
 // Zod schemas
 export const CreateBinRequest = z.object({
@@ -24,20 +38,161 @@ export const BinResponse = z.object({
 
 export type BinResponse = z.infer<typeof BinResponse>;
 
+const ListBinsResponse = z.array(BinResponse);
+
+const createBinRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["Bins"],
+  operationId: "createBin",
+  summary: "Create a bin",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: CreateBinRequest,
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      description: "Bin created",
+      content: {
+        "application/json": {
+          schema: BinResponse,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    403: {
+      description: "Owner role required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Warehouse not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    409: {
+      description: "Bin already exists",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const listBinsByWarehouseRoute = createRoute({
+  method: "get",
+  path: "/{warehouse_id}/bins",
+  tags: ["Bins"],
+  operationId: "getBinsByWarehouse",
+  summary: "List bins for a warehouse",
+  request: {
+    params: WarehouseIdParams,
+  },
+  responses: {
+    200: {
+      description: "Bins for the warehouse",
+      content: {
+        "application/json": {
+          schema: ListBinsResponse,
+        },
+      },
+    },
+    401: {
+      description: "Authentication required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Warehouse not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const getBinRoute = createRoute({
+  method: "get",
+  path: "/{id}",
+  tags: ["Bins"],
+  operationId: "getBin",
+  summary: "Get a bin",
+  request: {
+    params: IdParams,
+  },
+  responses: {
+    200: {
+      description: "Bin details",
+      content: {
+        "application/json": {
+          schema: BinResponse,
+        },
+      },
+    },
+    401: {
+      description: "Authentication required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Bin not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+function toBinResponse(record: {
+  id: string;
+  warehouse_id: string;
+  name: string;
+  created_at: Date;
+}): BinResponse {
+  return {
+    id: record.id,
+    warehouse_id: record.warehouse_id,
+    name: record.name,
+    created_at: record.created_at.toISOString(),
+  };
+}
+
 // POST /api/bins - Create a new bin
-router.post("/", async (c) => {
+binsRouter.openapi(createBinRoute, async (c) => {
   // Require owner role
   requireRole(c, "owner");
 
-  const body = await c.req.json();
-
-  // Validate input
-  const parsed = CreateBinRequest.safeParse(body);
-  if (!parsed.success) {
-    throw new BadRequestError("Invalid request");
-  }
-
-  const data = parsed.data;
+  const data = c.req.valid("json");
 
   // Get database client
   const db = c.get("db");
@@ -94,20 +249,15 @@ router.post("/", async (c) => {
     throw new Error("Failed to create bin");
   }
 
-  return c.json(result[0], 201);
+  return c.json(toBinResponse(result[0]), 201);
 });
 
 // GET /api/warehouses/:warehouse_id/bins - List bins for a warehouse
-router.get("/warehouses/:warehouse_id/bins", async (c) => {
+warehouseBinsRouter.openapi(listBinsByWarehouseRoute, async (c) => {
   // Require authentication
   requireAuth(c);
 
-  const warehouseId = c.req.param("warehouse_id");
-
-  // Validate UUID format
-  if (!z.string().uuid().safeParse(warehouseId).success) {
-    throw new BadRequestError("Invalid warehouse_id");
-  }
+  const { warehouse_id: warehouseId } = c.req.valid("param");
 
   // Get database client
   const db = c.get("db");
@@ -134,20 +284,15 @@ router.get("/warehouses/:warehouse_id/bins", async (c) => {
     .from(bin)
     .where(eq(bin.warehouse_id, warehouseId));
 
-  return c.json(bins);
+  return c.json(bins.map(toBinResponse), 200);
 });
 
 // GET /api/bins/:id - Get a single bin
-router.get("/:id", async (c) => {
+binsRouter.openapi(getBinRoute, async (c) => {
   // Require authentication
   requireAuth(c);
 
-  const binId = c.req.param("id");
-
-  // Validate UUID format
-  if (!z.string().uuid().safeParse(binId).success) {
-    throw new BadRequestError("Invalid bin id");
-  }
+  const { id: binId } = c.req.valid("param");
 
   // Get database client
   const db = c.get("db");
@@ -168,7 +313,8 @@ router.get("/:id", async (c) => {
     throw new NotFoundError("Bin not found");
   }
 
-  return c.json(result[0]);
+  return c.json(toBinResponse(result[0]), 200);
 });
 
-export default router;
+export { warehouseBinsRouter };
+export default binsRouter;

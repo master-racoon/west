@@ -4,17 +4,22 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler pages dev",
-    "build": "wrangler build",
+    "build": "npm run type-check && npm run openapi:export",
     "deploy": "wrangler pages deploy",
+    "logs": "wrangler pages deployment tail --project-name=warehouse-backend",
+    "openapi:export": "tsx src/scripts/export-openapi.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts .env.local",
     "db:migrate:prod": "tsx src/db/migrate.ts .env.prod",
     "db:drop": "drizzle-kit drop",
+    "scheduler:deploy": "wrangler deploy --config wrangler.scheduler.toml",
+    "scheduler:logs": "wrangler tail --config wrangler.scheduler.toml",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsgo --noEmit --incremental"
   },
   "dependencies": {
+    "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-openapi": "^1.1.5",
     "@neondatabase/serverless": "^0.9.5",
     "bcryptjs": "^3.0.3",
@@ -29,9 +34,12 @@
     "@types/node": "^22.9.0",
     "dotenv": "^17.4.1",
     "drizzle-kit": "^0.24.0",
+    "oxfmt": "latest",
+    "oxlint": "latest",
     "postgres": "^3.4.8",
     "tsx": "^4.21.0",
     "typescript": "^5.6.3",
+    "@typescript/native-preview": "latest",
     "vitest": "^1.6.1",
     "wrangler": "^3.114.17"
   },

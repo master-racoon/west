@@ -1,0 +1,29 @@
+{
+  "name": "healer-lint",
+  "description": "Auto-fix formatting and linting issues before healer applies substantive fixes",
+  "trigger": "HealerStart",
+  "action": "",
+  "applies-to": ["healer"],
+  "script": ".github/hooks/healer-lint.sh",
+  "logging": {
+    "report-to-agent": true,
+    "include-stdout": true,
+    "include-stderr": true
+  },
+  "config": {
+    "projects": ["warehouse-backend", "warehouse-frontend"],
+    "tools": {
+      "oxfmt": {
+        "enabled": true,
+        "auto-fix": true,
+        "description": "Format code with Oxfmt"
+      },
+      "oxlint": {
+        "enabled": true,
+        "auto-fix": true,
+        "with-types": true,
+        "description": "Lint with type-aware checks and auto-fix fixable issues"
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import React, { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { useCreateBin } from "../hooks/queries/useBins";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
 
@@ -46,7 +46,7 @@ export function BinCreate() {
     }
 
     try {
-      const result = await mutation.mutateAsync({
+      await mutation.mutateAsync({
         warehouse_id: warehouseId,
         name: binName,
       });

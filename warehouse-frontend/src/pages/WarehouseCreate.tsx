@@ -1,4 +1,4 @@
-import React, { FormEvent, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useCreateWarehouse } from "../hooks/queries/useWarehouses";
 
 export function WarehouseCreate() {

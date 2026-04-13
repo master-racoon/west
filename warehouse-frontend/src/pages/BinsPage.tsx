@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { BinCreate } from "../components/BinCreate";
 import { useBinsByWarehouse } from "../hooks/queries/useBins";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
