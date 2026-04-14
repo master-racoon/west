@@ -1,48 +1,76 @@
-// Mock API client - in a real app this would be auto-generated from OpenAPI schema
+import { ApiError, WarehouseClient } from "../generated-api";
+import { useAuthStore } from "../stores/authStore";
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    const bodyError =
+      typeof error.body === "object" &&
+      error.body !== null &&
+      "error" in error.body &&
+      typeof error.body.error === "string"
+        ? error.body.error
+        : null;
+
+    return bodyError || error.message || fallback;
+  }
+
+  return error instanceof Error ? error.message : fallback;
+}
+
+function handleUnauthorized(error: unknown): never {
+  if (error instanceof ApiError && error.status === 401) {
+    localStorage.removeItem("session_token");
+    useAuthStore.getState().clearUser();
+    window.location.replace("/login");
+  }
+
+  throw error;
+}
+
+async function withAuthHandling<T>(request: Promise<T>): Promise<T> {
+  try {
+    return await request;
+  } catch (error) {
+    handleUnauthorized(error);
+  }
+}
+
+const apiClient = new WarehouseClient({
+  BASE: "",
+  WITH_CREDENTIALS: true,
+  CREDENTIALS: "include",
+  HEADERS: async () => {
+    const token = localStorage.getItem("session_token");
+    const headers: Record<string, string> = {};
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return headers;
+  },
+});
+
 export const client = {
   warehouses: {
-    getWarehouses: async () => {
-      const response = await fetch("/api/warehouses");
-      if (!response.ok) throw new Error("Failed to fetch warehouses");
-      return response.json();
-    },
-    createWarehouse: async (data: { name: string; use_bins: boolean }) => {
-      const response = await fetch("/api/warehouses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        const msg = data?.error || "Failed to create warehouse";
-        throw new Error(`${response.status}: ${msg}`);
-      }
-      return response.json();
-    },
+    getWarehouses: () => withAuthHandling(apiClient.warehouses.getWarehouses()),
+    createWarehouse: (data: { name: string; use_bins: boolean }) =>
+      withAuthHandling(
+        apiClient.warehouses.createWarehouse({ requestBody: data }),
+      ),
+    updateWarehouse: (id: string, data: { name: string; use_bins: boolean }) =>
+      withAuthHandling(
+        apiClient.warehouses.updateWarehouse({ id, requestBody: data }),
+      ),
   },
   bins: {
-    createBin: async (data: { warehouse_id: string; name: string }) => {
-      const response = await fetch("/api/bins", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const resData = await response.json().catch(() => null);
-        const msg = resData?.error || "Failed to create bin";
-        throw new Error(`${response.status}: ${msg}`);
-      }
-      return response.json();
-    },
-    getBins: async ({ warehouseId }: { warehouseId: string }) => {
-      const response = await fetch(`/api/warehouses/${warehouseId}/bins`);
-      if (!response.ok) throw new Error("Failed to fetch bins");
-      return response.json();
-    },
-    getBin: async (binId: string) => {
-      const response = await fetch(`/api/bins/${binId}`);
-      if (!response.ok) throw new Error("Failed to fetch bin");
-      return response.json();
-    },
+    createBin: (data: { warehouse_id: string; name: string }) =>
+      withAuthHandling(apiClient.bins.createBin({ requestBody: data })),
+    getBins: ({ warehouseId }: { warehouseId: string }) =>
+      withAuthHandling(apiClient.bins.getBinsByWarehouse({ warehouseId })),
+    getBin: (binId: string) =>
+      withAuthHandling(apiClient.bins.getBin({ id: binId })),
   },
 };
+
+export { ApiError };

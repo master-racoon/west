@@ -21,19 +21,24 @@ updated: 2026-04-04T00:00:00Z
 - [x] Define WarehouseResponse Zod schema
 - [x] Implement POST /api/warehouses handler
 - [x] Implement GET /api/warehouses handler
+- [x] Implement PUT /api/warehouses/:id handler for warehouse edit
 - [x] Add route to app main file
 
 ## Frontend
 
-- [ ] Run npm run generate-api to update typed client
-- [ ] Create useCreateWarehouse() hook
-- [ ] Create useWarehouses() hook
-- [ ] Create WarehouseCreate.tsx component with form
-- [ ] Add form validation and error handling
+- [x] Sync frontend typed client for warehouse update contract
+- [x] Create useCreateWarehouse() hook
+- [x] Create useWarehouses() hook
+- [x] Create useUpdateWarehouse() hook
+- [x] Create WarehouseCreate.tsx component with form
+- [x] Add form validation and error handling
+- [x] Wire warehouse create flow into the configuration route
+- [x] Wire warehouse edit flow into the existing warehouse list
 
 ## Testing
 
 - [ ] Unit/integration tests for POST create (happy path)
 - [ ] Integration tests for GET list
+- [x] Add narrow backend test coverage for PUT update path
 - [ ] Error tests: duplicate name (409), non-owner (403), validation (400)
 - [ ] Edge cases: boundary lengths, special chars

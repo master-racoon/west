@@ -1,13 +1,17 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, sql } from "drizzle-orm";
-import { warehouse } from "../db/schema";
+import { and, eq, ne, sql } from "drizzle-orm";
+import { bin, warehouse } from "../db/schema";
 import { requireRole } from "../authorization/middleware";
-import { ConflictError, BadRequestError } from "../utils/errors";
+import { ConflictError, BadRequestError, NotFoundError } from "../utils/errors";
 
 const router = new OpenAPIHono<{ Variables: { db: any; auth: any } }>();
 
 const ErrorResponse = z.object({
   error: z.string(),
+});
+
+const WarehouseIdParams = z.object({
+  id: z.string().uuid(),
 });
 
 // Zod schemas
@@ -17,6 +21,10 @@ export const CreateWarehouseRequest = z.object({
 });
 
 export type CreateWarehouseRequest = z.infer<typeof CreateWarehouseRequest>;
+
+export const UpdateWarehouseRequest = CreateWarehouseRequest;
+
+export type UpdateWarehouseRequest = z.infer<typeof UpdateWarehouseRequest>;
 
 export const WarehouseResponse = z.object({
   id: z.string().uuid(),
@@ -98,6 +106,66 @@ const listWarehousesRoute = createRoute({
   },
 });
 
+const updateWarehouseRoute = createRoute({
+  method: "put",
+  path: "/{id}",
+  tags: ["Warehouses"],
+  operationId: "updateWarehouse",
+  summary: "Update a warehouse",
+  request: {
+    params: WarehouseIdParams,
+    body: {
+      content: {
+        "application/json": {
+          schema: UpdateWarehouseRequest,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Warehouse updated",
+      content: {
+        "application/json": {
+          schema: WarehouseResponse,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    403: {
+      description: "Owner role required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Warehouse not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    409: {
+      description: "Warehouse already exists",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
 function toWarehouseResponse(record: {
   id: string;
   name: string;
@@ -173,6 +241,81 @@ router.openapi(listWarehousesRoute, async (c) => {
     .orderBy(warehouse.created_at);
 
   return c.json(warehouses.map(toWarehouseResponse));
+});
+
+// PUT /api/warehouses/:id - Update an existing warehouse
+router.openapi(updateWarehouseRoute, async (c) => {
+  requireRole(c, "owner");
+
+  const { id } = c.req.valid("param");
+  const data = c.req.valid("json");
+  const normalizedName = data.name.trim().toLowerCase();
+
+  if (!normalizedName) {
+    throw new BadRequestError("Invalid request");
+  }
+
+  const db = c.get("db");
+
+  const existingWarehouse = await db
+    .select({ id: warehouse.id })
+    .from(warehouse)
+    .where(eq(warehouse.id, id))
+    .limit(1);
+
+  if (!existingWarehouse.length) {
+    throw new NotFoundError("Warehouse not found");
+  }
+
+  const duplicate = await db
+    .select({ id: warehouse.id })
+    .from(warehouse)
+    .where(
+      and(
+        eq(sql`LOWER(${warehouse.name})`, normalizedName),
+        ne(warehouse.id, id),
+      ),
+    )
+    .limit(1);
+
+  if (duplicate.length > 0) {
+    throw new ConflictError("Warehouse with this name already exists");
+  }
+
+  if (!data.use_bins) {
+    const existingBin = await db
+      .select({ id: bin.id })
+      .from(bin)
+      .where(eq(bin.warehouse_id, id))
+      .limit(1);
+
+    if (existingBin.length > 0) {
+      throw new BadRequestError(
+        "Cannot disable bins while bins still exist for this warehouse",
+      );
+    }
+  }
+
+  const result = await db
+    .update(warehouse)
+    .set({
+      name: data.name.trim(),
+      use_bins: data.use_bins,
+      updated_at: new Date(),
+    })
+    .where(eq(warehouse.id, id))
+    .returning({
+      id: warehouse.id,
+      name: warehouse.name,
+      use_bins: warehouse.use_bins,
+      created_at: warehouse.created_at,
+    });
+
+  if (!result.length) {
+    throw new NotFoundError("Warehouse not found");
+  }
+
+  return c.json(toWarehouseResponse(result[0]), 200);
 });
 
 export default router;

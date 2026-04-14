@@ -8,6 +8,7 @@ import {
   foreignKey,
   integer,
   text,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const warehouse = pgTable("warehouse", {
@@ -36,6 +37,32 @@ export const bin = pgTable(
       table.warehouse_id,
       table.name,
     ),
+  }),
+);
+
+export const item = pgTable("item", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+export const barcode = pgTable(
+  "barcode",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    item_id: uuid("item_id").notNull(),
+    barcode: varchar("barcode", { length: 200 }).notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    fk_item: foreignKey({
+      columns: [table.item_id],
+      foreignColumns: [item.id],
+    }).onDelete("cascade"),
+    uq_barcode_value: uniqueIndex("idx_barcode_unique").on(table.barcode),
+    idx_barcode_item_id: index("idx_barcode_item_id").on(table.item_id),
   }),
 );
 

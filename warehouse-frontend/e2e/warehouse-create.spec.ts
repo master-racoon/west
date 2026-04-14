@@ -5,15 +5,26 @@ function uniqueName(prefix: string) {
   return `${prefix} ${Date.now()}`;
 }
 
+async function loginAsOwner(
+  page: Parameters<typeof test.beforeEach>[0]["page"],
+) {
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Login as owner" }).click();
+  await page
+    .getByPlaceholder("Password")
+    .fill(process.env["PLAYWRIGHT_OWNER_PASSWORD"] ?? "warehouse1");
+  await page.getByRole("button", { name: "Login" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Create a New Warehouse" }),
+  ).toBeVisible();
+}
+
 test.describe("Warehouse Create", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsOwner(page);
+  });
+
   test("should create a warehouse without bins", async ({ page }) => {
-    await page.goto("/");
-
-    // Verify the form is visible
-    await expect(
-      page.getByRole("heading", { name: "Create a New Warehouse" }),
-    ).toBeVisible();
-
     // Fill in warehouse name
     await page
       .getByRole("textbox", { name: "Warehouse Name" })
@@ -39,8 +50,6 @@ test.describe("Warehouse Create", () => {
   });
 
   test("should create a warehouse with bins enabled", async ({ page }) => {
-    await page.goto("/");
-
     await page
       .getByRole("textbox", { name: "Warehouse Name" })
       .fill(uniqueName("WithBins"));
@@ -55,17 +64,14 @@ test.describe("Warehouse Create", () => {
     ).toBeVisible();
   });
 
-  test("should show error for duplicate warehouse name", async ({
-    page,
-    request,
-  }) => {
-    // Create a warehouse via API first
+  test("should show error for duplicate warehouse name", async ({ page }) => {
     const dupName = uniqueName("DupTest");
-    await request.post("/api/warehouses", {
-      data: { name: dupName, use_bins: false },
-    });
 
-    await page.goto("/");
+    await page.getByRole("textbox", { name: "Warehouse Name" }).fill(dupName);
+    await page.getByRole("button", { name: "Create Warehouse" }).click();
+    await expect(
+      page.getByText("Warehouse created successfully!"),
+    ).toBeVisible();
 
     // Try to create warehouse with same name
     await page.getByRole("textbox", { name: "Warehouse Name" }).fill(dupName);
@@ -77,8 +83,6 @@ test.describe("Warehouse Create", () => {
   });
 
   test("should prevent submission with empty name", async ({ page }) => {
-    await page.goto("/");
-
     // Try to submit without filling name
     await page.getByRole("button", { name: "Create Warehouse" }).click();
 
@@ -89,8 +93,6 @@ test.describe("Warehouse Create", () => {
   });
 
   test("should disable button while submitting", async ({ page }) => {
-    await page.goto("/");
-
     await page
       .getByRole("textbox", { name: "Warehouse Name" })
       .fill(uniqueName("BtnTest"));

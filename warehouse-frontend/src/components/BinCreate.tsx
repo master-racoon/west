@@ -1,6 +1,7 @@
 import { FormEvent, useState, useEffect } from "react";
 import { useCreateBin } from "../hooks/queries/useBins";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
+import { ApiError, getApiErrorMessage } from "../lib/api";
 
 export function BinCreate() {
   const [warehouseId, setWarehouseId] = useState("");
@@ -68,18 +69,16 @@ export function BinCreate() {
         setSuccess(false);
       }, 3000);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to create bin";
-      if (message.includes("409")) {
+      if (err instanceof ApiError && err.status === 409) {
         setError("A bin with this name already exists in this warehouse");
-      } else if (message.includes("400")) {
+      } else if (err instanceof ApiError && err.status === 400) {
         setError("Bins are not enabled for this warehouse");
-      } else if (message.includes("404")) {
+      } else if (err instanceof ApiError && err.status === 404) {
         setError("Warehouse not found");
-      } else if (message.includes("403")) {
+      } else if (err instanceof ApiError && err.status === 403) {
         setError("You do not have permission to create bins");
       } else {
-        setError(message);
+        setError(getApiErrorMessage(err, "Failed to create bin"));
       }
     }
   };

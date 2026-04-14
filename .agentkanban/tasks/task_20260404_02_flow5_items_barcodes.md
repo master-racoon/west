@@ -1,11 +1,13 @@
 ---
 title: "[DEV] US-1.2 Create and Manage Items with Barcodes"
-lane: todo
+lane: doing
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-04T00:00:00Z
-description: "Owner creates items and assigns multiple barcodes to track SKUs"
+updated: 2026-04-13T14:41:39.700Z
+description: Owner creates items and assigns multiple barcodes to track SKUs
 labels:
   - flow-5-configuration
+sortOrder: 1
+slug: flow5_items_barcodes
 ---
 
 ## DFD Reference

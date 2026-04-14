@@ -13,6 +13,11 @@ export interface CreateWarehouseRequest {
   use_bins: boolean;
 }
 
+export interface UpdateWarehouseRequest {
+  name: string;
+  use_bins: boolean;
+}
+
 export function useWarehouses() {
   return useQuery({
     queryKey: ["warehouses"],
@@ -28,6 +33,18 @@ export function useCreateWarehouse() {
       client.warehouses.createWarehouse(data),
     onSuccess: () => {
       // Invalidate the warehouses list to refetch after creation
+      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
+    },
+  });
+}
+
+export function useUpdateWarehouse() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateWarehouseRequest }) =>
+      client.warehouses.updateWarehouse(id, data),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["warehouses"] });
     },
   });

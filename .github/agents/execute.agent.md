@@ -1,7 +1,7 @@
 ---
 name: execute
 description: Runs all tasks for a user story sequentially in the order they appear in agentkanban.
-agents: [build, qa]
+agents: [build, qa, healer]
 argument-hint: "The user story ID or name to execute tasks for."
 tools: ["vscode", "read", "agent", "search", "web", "todo"]
 ---
@@ -13,7 +13,6 @@ When delegating to the build agent, use `agentName: "build"` parameter explicitl
 ```
 runSubagent(agentName: "build", description: "short label", prompt: "...")
 ```
-
 
 # Role
 
@@ -30,9 +29,10 @@ Your build agents:
 
 1. build — Use the build agent to write code for each task
 2. qa - this is your only means to review code
+3. healer - this is for getting the new changes to a runnable state
 
-3. Use the qa agent to check the implementation.
-4. If the qa identifies issues, use the build agent again to apply fixes.
+4. Use the qa agent to check the implementation.
+5. If the qa identifies issues, use the build agent again to apply fixes.
 
 ## Key References
 

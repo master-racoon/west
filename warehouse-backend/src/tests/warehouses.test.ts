@@ -178,4 +178,37 @@ describe("Warehouse Routes", () => {
       }
     });
   });
+
+  describe("PUT /api/warehouses/:id", () => {
+    it("should update a warehouse name and use_bins flag", async () => {
+      const owner = await signupUser("owner");
+
+      const createRes = await makeRequest("POST", "/api/warehouses", {
+        body: JSON.stringify({
+          name: "Original Warehouse",
+          use_bins: false,
+        }),
+      });
+
+      expect(createRes.status).toBe(201);
+      const created = (await createRes.json()) as { id: string };
+
+      const updateRes = await makeRequest(
+        "PUT",
+        `/api/warehouses/${created.id}`,
+        {
+          body: JSON.stringify({
+            name: "Updated Warehouse",
+            use_bins: true,
+          }),
+        },
+      );
+
+      expect(updateRes.status).toBe(200);
+      const updated = (await updateRes.json()) as Record<string, unknown>;
+      expect(updated.id).toBe(created.id);
+      expect(updated.name).toBe("Updated Warehouse");
+      expect(updated.use_bins).toBe(true);
+    });
+  });
 });

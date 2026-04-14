@@ -1,8 +1,11 @@
 import { NavLink } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 
-const navItems = [
+const ownerNavItems = [
   { label: "Configuration", to: "/dashboard/configuration" },
+];
+
+const navItems = [
   { label: "Add Stock", to: "/dashboard/add" },
   { label: "Remove Stock", to: "/dashboard/remove" },
   { label: "Transfer Stock", to: "/dashboard/transfer" },
@@ -45,6 +48,10 @@ export function SideMenu() {
       {user?.role === "owner" && (
         <NavItem to="/dashboard/users" label="Users" />
       )}
+      {user?.role === "owner" &&
+        ownerNavItems.map((item) => (
+          <NavItem key={item.to} to={item.to} label={item.label} />
+        ))}
       {navItems.map((item) => (
         <NavItem key={item.to} to={item.to} label={item.label} />
       ))}

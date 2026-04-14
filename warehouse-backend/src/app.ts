@@ -2,11 +2,13 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { swaggerUI } from "@hono/swagger-ui";
 import { logger } from "hono/logger";
 import { createDbClient } from "./db";
+import { getSession } from "./authorization/middleware";
 import { AppError } from "./utils/errors";
 import warehouseRoutes from "./routes/warehouses";
 import binsRoutes, { warehouseBinsRouter } from "./routes/bins";
 import authRoutes from "./routes/auth";
 import usersRoutes from "./routes/users";
+import itemsRoutes, { barcodeLookupRouter } from "./routes/items";
 
 interface Bindings {
   DATABASE_URL?: string;
@@ -25,7 +27,8 @@ export const openApiDocumentConfig = {
   info: {
     title: "Warehouse API",
     version: "1.0.0",
-    description: "API for warehouses, bins, users, and authentication",
+    description:
+      "API for warehouses, bins, items, barcodes, users, and authentication",
   },
   servers: [
     {
@@ -77,14 +80,10 @@ app.use("*", async (c, next) => {
   const db = createDbClient(databaseUrl);
   c.set("db", db);
 
-  // Mock auth - replace with BetterAuth session once auth is wired up
-  c.set("auth", {
-    user: {
-      id: "test-user-id",
-      email: "test@example.com",
-      role: "owner",
-    },
-  });
+  const sessionUser = getSession(c);
+  if (sessionUser) {
+    c.set("auth", { user: sessionUser });
+  }
 
   await next();
 });
@@ -106,6 +105,8 @@ app.route("/api/users", usersRoutes);
 app.route("/api/warehouses", warehouseRoutes);
 app.route("/api/bins", binsRoutes);
 app.route("/api/warehouses", warehouseBinsRouter);
+app.route("/api/items", itemsRoutes);
+app.route("/api/barcodes", barcodeLookupRouter);
 
 // Health check
 app.get("/health", (c) => {

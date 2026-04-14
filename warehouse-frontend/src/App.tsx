@@ -3,9 +3,24 @@ import { LoginPage } from "./pages/LoginPage";
 import { AppLayout } from "./pages/AppLayout";
 import { ProtectedRouteGuard } from "./components/ProtectedRouteGuard";
 import { UsersPage } from "./pages/UsersPage";
+import { WarehouseCreate } from "./pages/WarehouseCreate";
+import { useAuthStore } from "./stores/authStore";
 
 function ComingSoon({ label }: { label: string }) {
   return <div>{label} — Coming Soon</div>;
+}
+
+function DashboardIndexRedirect() {
+  const { user } = useAuthStore();
+
+  return (
+    <Navigate
+      to={
+        user?.role === "owner" ? "/dashboard/configuration" : "/dashboard/add"
+      }
+      replace
+    />
+  );
 }
 
 export function App() {
@@ -16,15 +31,9 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRouteGuard />}>
           <Route path="/dashboard" element={<AppLayout />}>
-            <Route
-              index
-              element={<Navigate to="/dashboard/configuration" replace />}
-            />
+            <Route index element={<DashboardIndexRedirect />} />
             <Route path="users" element={<UsersPage />} />
-            <Route
-              path="configuration"
-              element={<ComingSoon label="Configuration" />}
-            />
+            <Route path="configuration" element={<WarehouseCreate />} />
             <Route path="add" element={<ComingSoon label="Add Stock" />} />
             <Route
               path="remove"
