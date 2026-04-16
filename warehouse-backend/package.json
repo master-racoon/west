@@ -14,7 +14,8 @@
     "db:drop": "drizzle-kit drop",
     "scheduler:deploy": "wrangler deploy --config wrangler.scheduler.toml",
     "scheduler:logs": "wrangler tail --config wrangler.scheduler.toml",
-    "test": "vitest",
+    "test": "node -e \"console.error('Use make test-backend for backend tests.'); process.exit(1)\"",
+    "test:integration": "vitest run",
     "test:watch": "vitest --watch",
     "type-check": "tsgo --noEmit --incremental"
   },

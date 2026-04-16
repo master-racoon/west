@@ -78,5 +78,5 @@ This auto-fixes formatting (oxfmt) and linting issues (oxlint with types) on bot
 - Backend: Hono + Drizzle + Zod. Run from `warehouse-backend/`. Dev vars in `.dev.vars`
 - Frontend: Vite + React + TanStack Query. Run from `warehouse-frontend/`
 - DB migrations: `npm run db:generate` → `npm run db:migrate` in `warehouse-backend/`
-- Tests: `npm test` in `warehouse-backend/` (Vitest), `npx playwright test` in `warehouse-frontend/`
+- Tests: `make test-backend` for DB-backed backend integration tests, `npx playwright test` in `warehouse-frontend/`
 - No new markdown files

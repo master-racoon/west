@@ -22,9 +22,6 @@ export default defineConfig({
       },
     },
   },
-  optimizeDeps: {
-    exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/core"],
-  },
   build: {
     outDir: "dist",
     sourcemap: true,
@@ -36,12 +33,6 @@ export default defineConfig({
 
           // State management & data fetching
           "state-vendor": ["zustand", "@tanstack/react-query"],
-
-          // Canvas/Drawing libraries (large - lazy load candidates)
-          "konva-vendor": ["konva", "react-konva"],
-
-          // FFmpeg (very large - should be lazy loaded)
-          "ffmpeg-vendor": ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
         },
       },
     },

@@ -41,7 +41,7 @@ npm run db:migrate:prod  # Apply to production
 
 ## Testing
 
-**Backend** (`npm test` in `warehouse-backend/`): Vitest integration tests against Dockerized Postgres (port 5433). Tests make real HTTP calls. Helpers in `src/tests/helpers.ts` (`clearDatabase()`, `signupUser()`).
+**Backend** (`make test-backend`): Canonical DB-backed backend integration test flow. It starts the compose test stack, applies backend migrations, and runs Vitest against the isolated test database. Helpers in `src/tests/helpers.ts` (`clearDatabase()`, `signupUser()`).
 
 **E2E** (`make test-e2e`): Playwright tests in `warehouse-frontend/e2e/`. Full Docker stack. Auth setup in `auth.setup.ts`.
 

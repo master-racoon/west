@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach } from "vitest";
 import app from "../app";
 import { clearDatabase, signupUser } from "./helpers";
 
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set for tests");
+}
+
+const testBindings = {
+  DATABASE_URL: databaseUrl,
+  APP_PASSWORD: "test-password",
+  FRONTEND_URL: "http://localhost:5173",
+};
+
 const makeRequest = (
   method: string,
   path: string,
@@ -13,11 +25,13 @@ const makeRequest = (
     headers["Content-Type"] = "application/json";
   }
   return app.request(
-    new Request(url, {
+    url,
+    {
       method,
       body: options?.body,
       headers,
-    }),
+    },
+    testBindings,
   );
 };
 
@@ -31,6 +45,9 @@ describe("Warehouse Routes", () => {
       const owner = await signupUser("owner");
 
       const res = await makeRequest("POST", "/api/warehouses", {
+        headers: {
+          Authorization: `Bearer ${owner.token}`,
+        },
         body: JSON.stringify({
           name: "Main Warehouse",
           use_bins: true,
@@ -49,21 +66,27 @@ describe("Warehouse Routes", () => {
       const user = await signupUser("user");
 
       const res = await makeRequest("POST", "/api/warehouses", {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
         body: JSON.stringify({
           name: "Another Warehouse",
           use_bins: false,
         }),
       });
 
-      // Mock app would need proper auth setup for this to work
-      // This test is a placeholder for integration test
+      expect(res.status).toBe(403);
     });
 
     it("should return 409 for duplicate warehouse name", async () => {
       const owner = await signupUser("owner");
+      const headers = {
+        Authorization: `Bearer ${owner.token}`,
+      };
 
       // First warehouse
       const res1 = await makeRequest("POST", "/api/warehouses", {
+        headers,
         body: JSON.stringify({
           name: "Duplicate Test",
           use_bins: false,
@@ -73,21 +96,25 @@ describe("Warehouse Routes", () => {
 
       // Duplicate name
       const res2 = await makeRequest("POST", "/api/warehouses", {
+        headers,
         body: JSON.stringify({
           name: "Duplicate Test",
           use_bins: true,
         }),
       });
 
-      // Should return 409 Conflict
-      // Note: This requires proper database implementation
+      expect(res2.status).toBe(409);
     });
 
     it("should be case-insensitive for name uniqueness", async () => {
       const owner = await signupUser("owner");
+      const headers = {
+        Authorization: `Bearer ${owner.token}`,
+      };
 
       // First warehouse
       const res1 = await makeRequest("POST", "/api/warehouses", {
+        headers,
         body: JSON.stringify({
           name: "Warehouse A",
           use_bins: false,
@@ -97,20 +124,25 @@ describe("Warehouse Routes", () => {
 
       // Same name different case
       const res2 = await makeRequest("POST", "/api/warehouses", {
+        headers,
         body: JSON.stringify({
           name: "warehouse a",
           use_bins: false,
         }),
       });
 
-      // Should also return 409 Conflict due to case-insensitive uniqueness
+      expect(res2.status).toBe(409);
     });
 
     it("should handle boundary names (1-100 chars)", async () => {
       const owner = await signupUser("owner");
+      const headers = {
+        Authorization: `Bearer ${owner.token}`,
+      };
 
       // 1 character
       const res1 = await makeRequest("POST", "/api/warehouses", {
+        headers,
         body: JSON.stringify({
           name: "A",
           use_bins: false,
@@ -121,6 +153,7 @@ describe("Warehouse Routes", () => {
       // 100 characters
       const longName = "A".repeat(100);
       const res2 = await makeRequest("POST", "/api/warehouses", {
+        headers,
         body: JSON.stringify({
           name: longName,
           use_bins: false,
@@ -134,13 +167,16 @@ describe("Warehouse Routes", () => {
 
       // Empty name
       const res = await makeRequest("POST", "/api/warehouses", {
+        headers: {
+          Authorization: `Bearer ${owner.token}`,
+        },
         body: JSON.stringify({
           name: "",
           use_bins: false,
         }),
       });
 
-      // Should return 400 Bad Request
+      expect(res.status).toBe(400);
     });
   });
 
@@ -158,6 +194,9 @@ describe("Warehouse Routes", () => {
 
       // Create warehouses
       await makeRequest("POST", "/api/warehouses", {
+        headers: {
+          Authorization: `Bearer ${owner.token}`,
+        },
         body: JSON.stringify({
           name: "Warehouse 1",
           use_bins: true,
@@ -182,8 +221,12 @@ describe("Warehouse Routes", () => {
   describe("PUT /api/warehouses/:id", () => {
     it("should update a warehouse name and use_bins flag", async () => {
       const owner = await signupUser("owner");
+      const headers = {
+        Authorization: `Bearer ${owner.token}`,
+      };
 
       const createRes = await makeRequest("POST", "/api/warehouses", {
+        headers,
         body: JSON.stringify({
           name: "Original Warehouse",
           use_bins: false,
@@ -197,6 +240,7 @@ describe("Warehouse Routes", () => {
         "PUT",
         `/api/warehouses/${created.id}`,
         {
+          headers,
           body: JSON.stringify({
             name: "Updated Warehouse",
             use_bins: true,

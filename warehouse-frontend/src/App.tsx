@@ -1,9 +1,17 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  NavLink,
+} from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { AppLayout } from "./pages/AppLayout";
 import { ProtectedRouteGuard } from "./components/ProtectedRouteGuard";
 import { UsersPage } from "./pages/UsersPage";
 import { WarehouseCreate } from "./pages/WarehouseCreate";
+import { ProductsPage } from "./pages/ProductsPage";
+import { AddStockPage } from "./pages/AddStock";
 import { useAuthStore } from "./stores/authStore";
 
 function ComingSoon({ label }: { label: string }) {
@@ -16,10 +24,94 @@ function DashboardIndexRedirect() {
   return (
     <Navigate
       to={
-        user?.role === "owner" ? "/dashboard/configuration" : "/dashboard/add"
+        user?.role === "owner"
+          ? "/dashboard/configuration"
+          : "/dashboard/products"
       }
       replace
     />
+  );
+}
+
+function InventoryPage() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-5xl mx-auto py-6 sm:px-6 lg:px-8 space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Work with stock movements from the inventory workspace.
+          </p>
+        </div>
+
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex gap-6" aria-label="Inventory tabs">
+            <NavLink
+              to="add"
+              className={({ isActive }) =>
+                `border-b-2 px-1 pb-3 text-sm font-medium ${
+                  isActive
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                }`
+              }
+            >
+              Add
+            </NavLink>
+            <NavLink
+              to="remove"
+              className={({ isActive }) =>
+                `border-b-2 px-1 pb-3 text-sm font-medium ${
+                  isActive
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                }`
+              }
+            >
+              Remove
+            </NavLink>
+            <NavLink
+              to="transfer"
+              className={({ isActive }) =>
+                `border-b-2 px-1 pb-3 text-sm font-medium ${
+                  isActive
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                }`
+              }
+            >
+              Transfer
+            </NavLink>
+            <NavLink
+              to="quickcount"
+              className={({ isActive }) =>
+                `border-b-2 px-1 pb-3 text-sm font-medium ${
+                  isActive
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                }`
+              }
+            >
+              Quick Count
+            </NavLink>
+          </nav>
+        </div>
+
+        <Routes>
+          <Route index element={<Navigate to="add" replace />} />
+          <Route path="add" element={<AddStockPage embedded />} />
+          <Route path="remove" element={<ComingSoon label="Remove Stock" />} />
+          <Route
+            path="transfer"
+            element={<ComingSoon label="Transfer Stock" />}
+          />
+          <Route
+            path="quickcount"
+            element={<ComingSoon label="Quick Count" />}
+          />
+        </Routes>
+      </div>
+    </div>
   );
 }
 
@@ -34,21 +126,28 @@ export function App() {
             <Route index element={<DashboardIndexRedirect />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="configuration" element={<WarehouseCreate />} />
-            <Route path="add" element={<ComingSoon label="Add Stock" />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route
+              path="add"
+              element={<Navigate to="/dashboard/inventory/add" replace />}
+            />
             <Route
               path="remove"
-              element={<ComingSoon label="Remove Stock" />}
+              element={<Navigate to="/dashboard/inventory/remove" replace />}
             />
             <Route
               path="transfer"
-              element={<ComingSoon label="Transfer Stock" />}
+              element={<Navigate to="/dashboard/inventory/transfer" replace />}
             />
             <Route
               path="quickcount"
-              element={<ComingSoon label="Quick Count" />}
+              element={
+                <Navigate to="/dashboard/inventory/quickcount" replace />
+              }
             />
+            <Route path="inventory/*" element={<InventoryPage />} />
             <Route
-              path="inventory"
+              path="inventory-visibility"
               element={<ComingSoon label="Inventory Visibility" />}
             />
           </Route>

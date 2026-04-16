@@ -6,11 +6,9 @@ const ownerNavItems = [
 ];
 
 const navItems = [
-  { label: "Add Stock", to: "/dashboard/add" },
-  { label: "Remove Stock", to: "/dashboard/remove" },
-  { label: "Transfer Stock", to: "/dashboard/transfer" },
-  { label: "Quick Count", to: "/dashboard/quickcount" },
-  { label: "Inventory Visibility", to: "/dashboard/inventory" },
+  { label: "Products", to: "/dashboard/products" },
+  { label: "Inventory", to: "/dashboard/inventory" },
+  { label: "Inventory Visibility", to: "/dashboard/inventory-visibility" },
 ];
 
 function NavItem({ to, label }: { to: string; label: string }) {

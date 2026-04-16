@@ -22,6 +22,27 @@
       "when": 1775907315696,
       "tag": "0002_useful_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776105600000,
+      "tag": "0003_tan_products",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776124800000,
+      "tag": "0004_flow1_inventory_movements",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776255069878,
+      "tag": "0005_unique_thunderbird",
+      "breakpoints": true
     }
   ]
 }

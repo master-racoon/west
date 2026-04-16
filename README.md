@@ -42,11 +42,11 @@ Comprehensive test suite with backend API tests (Vitest) and frontend E2E tests 
 
 ```bash
 make test              # Run all tests
-make test-backend      # Backend unit tests
+make test-backend      # DB-backed backend integration tests
 make test-e2e          # E2E tests
 ```
 
-Tests run in isolated Docker containers with their own database and automatically seeded test users. See [TESTING.md](./TESTING.md) for detailed testing guide.
+`make test-backend` runs the canonical backend integration flow: compose-managed test database, backend migrations, and Vitest against the isolated test stack.
 
 ## Project Structure
 

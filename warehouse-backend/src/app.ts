@@ -9,6 +9,7 @@ import binsRoutes, { warehouseBinsRouter } from "./routes/bins";
 import authRoutes from "./routes/auth";
 import usersRoutes from "./routes/users";
 import itemsRoutes, { barcodeLookupRouter } from "./routes/items";
+import inventoryRoutes from "./routes/inventory";
 
 interface Bindings {
   DATABASE_URL?: string;
@@ -28,7 +29,7 @@ export const openApiDocumentConfig = {
     title: "Warehouse API",
     version: "1.0.0",
     description:
-      "API for warehouses, bins, items, barcodes, users, and authentication",
+      "API for warehouses, bins, items, inventory, barcodes, users, and authentication",
   },
   servers: [
     {
@@ -107,6 +108,7 @@ app.route("/api/bins", binsRoutes);
 app.route("/api/warehouses", warehouseBinsRouter);
 app.route("/api/items", itemsRoutes);
 app.route("/api/barcodes", barcodeLookupRouter);
+app.route("/api/inventory", inventoryRoutes);
 
 // Health check
 app.get("/health", (c) => {

@@ -2,7 +2,7 @@
 title: "[DEV] US-1.2 Create and Manage Items with Barcodes"
 lane: doing
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-13T14:41:39.700Z
+updated: 2026-04-14T12:00:00.000Z
 description: Owner creates items and assigns multiple barcodes to track SKUs
 labels:
   - flow-5-configuration
@@ -205,3 +205,9 @@ export function useAddBarcode() {
 ## Conversation
 
 ### user
+
+### assistant
+
+- Implemented backend `item` + `barcode` schema, routes for create/list/detail/add-barcode, and barcode lookup for stock-flow discoverability.
+- Added a manual migration SQL file and journal entry because command execution is not available in this session.
+- Added frontend products query hooks, a `Products` page with create/search/detail/add-barcode workflow, and changed the sidebar label from stock placeholders to `Products`.

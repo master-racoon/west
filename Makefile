@@ -23,8 +23,8 @@ help:
 	@echo "  make stop       - Stop all services"
 	@echo "  make clean      - Stop all services and clean up"
 	@echo "  make logs       - Show logs from all services"
-	@echo "  make test       - Run all tests (backend + e2e)"
-	@echo "  make test-backend     - Run backend tests only"
+	@echo "  make test       - Run backend tests and E2E tests"
+	@echo "  make test-backend     - Run the canonical backend test flow (Docker DB + migrations + Vitest)"
 	@echo "  make test-e2e         - Run E2E tests"
 	@echo "  make context-check    - Validate AI context files against actual codebase"
 	@echo "  make deploy     - Deploy all services (backend, scheduler, frontend)"
@@ -172,8 +172,10 @@ test: test-backend test-e2e
 # Run backend tests with Docker
 test-backend:
 	@echo "🧪 Running backend tests..."
-	@$(DOCKER_COMPOSE) --profile test up --abort-on-container-exit --exit-code-from test-runner
-	@$(DOCKER_COMPOSE) --profile test down
+	@status=0; \
+	$(DOCKER_COMPOSE) --profile test up --abort-on-container-exit --exit-code-from test-runner || status=$$?; \
+	$(DOCKER_COMPOSE) --profile test down -v --remove-orphans; \
+	exit $$status
 	@echo "✅ Backend tests completed!"
 
 # Run E2E tests with Docker

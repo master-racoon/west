@@ -71,6 +71,44 @@ export const client = {
     getBin: (binId: string) =>
       withAuthHandling(apiClient.bins.getBin({ id: binId })),
   },
+  inventory: {
+    addStock: (data: {
+      warehouse_id: string;
+      barcode_or_item_id: string;
+      quantity: number;
+      bin_id?: string;
+    }) => withAuthHandling(apiClient.inventory.addStock({ requestBody: data })),
+    getBalance: (filters?: {
+      warehouse_id?: string;
+      bin_id?: string;
+      item_id?: string;
+    }) =>
+      withAuthHandling(
+        apiClient.inventory.getInventoryBalance({
+          warehouseId: filters?.warehouse_id,
+          binId: filters?.bin_id,
+          itemId: filters?.item_id,
+        }),
+      ),
+  },
+  items: {
+    getItems: () => withAuthHandling(apiClient.items.getItems()),
+    getItem: (itemId: string) =>
+      withAuthHandling(apiClient.items.getItem({ id: itemId })),
+    createItem: (data: {
+      name: string;
+      description?: string;
+      barcodes?: string[];
+    }) => withAuthHandling(apiClient.items.createItem({ requestBody: data })),
+    addBarcode: (itemId: string, data: { barcode: string }) =>
+      withAuthHandling(
+        apiClient.items.addBarcode({ id: itemId, requestBody: data }),
+      ),
+  },
+  barcodes: {
+    lookupItemByBarcode: (barcode: string) =>
+      withAuthHandling(apiClient.barcodes.lookupItemByBarcode({ barcode })),
+  },
 };
 
 export { ApiError };

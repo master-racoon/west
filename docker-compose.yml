@@ -46,18 +46,16 @@ services:
     image: node:20
     container_name: warehouse-backend-test
     working_dir: /app
-    command: sh -c "apt-get update && apt-get install -y curl && npm install && cp /tmp/.dev.vars.test .dev.vars && npm run db:migrate && npm run db:seed:e2e && npm run dev"
+    command: sh -c "apt-get update && apt-get install -y curl && npm install && DATABASE_URL=postgresql://postgres:postgres@postgres-test:5432/warehouse_test npm run db:migrate && npm run dev -- --ip 0.0.0.0 --port 8788"
     env_file:
       - ./warehouse-backend/.env.test
     environment:
-      # Override for migrations to use direct postgres
-      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/warehouse_test
+      DATABASE_URL: postgresql://postgres:postgres@neon-proxy-test.localtest.me:4444/warehouse_test
     networks:
       - test-network
     volumes:
       - ./warehouse-backend:/app
       - backend-test-node-modules:/app/node_modules
-      - ./warehouse-backend/.dev.vars.test:/tmp/.dev.vars.test:ro
     ports:
       - "8789:8788"
     depends_on:
@@ -66,7 +64,6 @@ services:
       neon-proxy-test:
         condition: service_started
     profiles:
-      - test
       - e2e
 
   # Test runner service (runs migrations, seeds via API, and runs tests)
@@ -74,20 +71,21 @@ services:
     image: node:20
     container_name: warehouse-test-runner
     working_dir: /app
-    command: sh -c "npm install && npm run db:migrate && sleep 10 && npm test"
+    command: sh -c "npm install && DATABASE_URL=postgresql://postgres:postgres@postgres-test:5432/warehouse_test npm run db:migrate && npm run test:integration"
     env_file:
       - ./warehouse-backend/.env.test
     environment:
-      TEST_API_URL: http://backend-test:8788
-      # Override DATABASE_URL for migrations to use direct postgres connection
-      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/warehouse_test
+      DATABASE_URL: postgresql://postgres:postgres@neon-proxy-test.localtest.me:4444/warehouse_test
     volumes:
       - ./warehouse-backend:/app
       - test-runner-node-modules:/app/node_modules
     networks:
       - test-network
     depends_on:
-      - backend-test
+      postgres-test:
+        condition: service_healthy
+      neon-proxy-test:
+        condition: service_started
     profiles:
       - test
 
