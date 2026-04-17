@@ -43,6 +43,20 @@
       "when": 1776255069878,
       "tag": "0005_unique_thunderbird",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776384000000,
+      "tag": "0006_flow2_remove_override",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776387600000,
+      "tag": "0007_flow2_async_removal_approvals",
+      "breakpoints": true
     }
   ]
 }

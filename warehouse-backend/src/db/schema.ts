@@ -75,6 +75,12 @@ export const movementType = pgEnum("movement_type", [
   "MANUAL_ADJUSTMENT",
 ]);
 
+export const removalApprovalStatus = pgEnum("removal_approval_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
 export const movement = pgTable(
   "movement",
   {
@@ -87,6 +93,7 @@ export const movement = pgTable(
     dest_warehouse_id: uuid("dest_warehouse_id"),
     dest_bin_id: uuid("dest_bin_id"),
     quantity: integer("quantity").notNull(),
+    override_by_owner: boolean("override_by_owner").default(false).notNull(),
     note: text("note"),
     created_at: timestamp("created_at").defaultNow().notNull(),
   },
@@ -135,3 +142,56 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("user"),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const removalApproval = pgTable(
+  "removal_approval",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: uuid("user_id").notNull(),
+    item_id: uuid("item_id").notNull(),
+    warehouse_id: uuid("warehouse_id").notNull(),
+    bin_id: uuid("bin_id"),
+    quantity_requested: integer("quantity_requested").notNull(),
+    current_balance: integer("current_balance").notNull(),
+    status: removalApprovalStatus("status").default("pending").notNull(),
+    approved_by_owner: uuid("approved_by_owner"),
+    movement_id: uuid("movement_id"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    decided_at: timestamp("decided_at"),
+  },
+  (table) => ({
+    fk_user: foreignKey({
+      columns: [table.user_id],
+      foreignColumns: [users.id],
+    }).onDelete("restrict"),
+    fk_item: foreignKey({
+      columns: [table.item_id],
+      foreignColumns: [item.id],
+    }).onDelete("restrict"),
+    fk_warehouse: foreignKey({
+      columns: [table.warehouse_id],
+      foreignColumns: [warehouse.id],
+    }).onDelete("restrict"),
+    fk_bin: foreignKey({
+      columns: [table.bin_id],
+      foreignColumns: [bin.id],
+    }).onDelete("restrict"),
+    fk_approved_by_owner: foreignKey({
+      columns: [table.approved_by_owner],
+      foreignColumns: [users.id],
+    }).onDelete("restrict"),
+    fk_movement: foreignKey({
+      columns: [table.movement_id],
+      foreignColumns: [movement.id],
+    }).onDelete("set null"),
+    idx_removal_approval_status: index("idx_removal_approval_status").on(
+      table.status,
+    ),
+    idx_removal_approval_user_id: index("idx_removal_approval_user_id").on(
+      table.user_id,
+    ),
+    idx_removal_approval_created_at: index(
+      "idx_removal_approval_created_at",
+    ).on(table.created_at),
+  }),
+);

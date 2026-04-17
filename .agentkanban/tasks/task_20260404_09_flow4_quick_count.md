@@ -2,7 +2,7 @@
 title: "[DEV] US-5.1 Quick Count and Reconcile Inventory"
 lane: todo
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-04T00:00:00Z
+updated: 2026-04-16T00:00:00Z
 description: "User counts physical items and adjusts inventory to match observation"
 labels:
   - flow-4-quick-count
@@ -150,3 +150,29 @@ export function useCountAdjust() {
 ## Conversation
 
 ### user
+
+### assistant
+
+Implemented the Flow-4 quick count slice end to end. Backend now exposes `POST /api/inventory/count-adjust` with warehouse/bin/item validation, advisory-lock balance reconciliation, and `COUNT_ADJUSTMENT` movement creation for positive, negative, and zero deltas. Frontend Inventory now renders a real Quick Count tab with warehouse and conditional bin selection, barcode-or-item resolution, recorded balance context, delta preview, result summary, and a fast next-count reset flow. Added backend integration coverage for positive, negative, zero-delta, and bin-required cases.
+
+### user
+
+Repair the Flow 4 quick-count implementation in the west workspace based on these QA findings for /Users/ulf/Documents/GitHub/west/.agentkanban/tasks/task_20260404_09_flow4_quick_count.md:
+
+1. Blocking: the new DB-backed quick-count backend tests race with other DB-backed test files because they share full-database truncation without serialization. Apply a narrow fix so the supported backend test harness can run these DB-backed files reliably.
+2. Medium: the Quick Count UI only offers a free-text barcode/item-id input, but the task calls for scanner or selector. Add the smallest reasonable item-selection fallback without bloating the page.
+3. Low: the task says error toast; the page currently only shows inline/banner error state. Add the smallest aligned error feedback improvement.
+
+Do not broaden scope into unrelated test-harness redesign or unrelated backend issues. Update the task history if your workflow expects it. Return a concise summary of changes, validation, and any remaining risks.
+
+### agent
+
+Applied a narrow Flow 4 QA repair.
+
+- Backend harness: serialized backend Vitest files for the supported integration run so the DB-backed quick-count and warehouse tests no longer race on shared full-database truncation.
+- Quick Count UI: kept the existing scanner/item-id path and added a compact item selector fallback that resolves directly into the same count flow.
+- Error feedback: added a small transient error toast alongside the existing inline error banner so failures are easier to notice without introducing a broader notification system.
+
+Validation in this pass: editor diagnostics on the touched backend config and Quick Count page after the patch. Not run here: backend tests, frontend tests, or API export/codegen commands.
+
+Remaining risk: backend test serialization is intentionally coarse at the file level for reliability; if the suite grows substantially, a more granular isolation strategy may be worth revisiting later.

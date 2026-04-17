@@ -12,6 +12,9 @@ import { UsersPage } from "./pages/UsersPage";
 import { WarehouseCreate } from "./pages/WarehouseCreate";
 import { ProductsPage } from "./pages/ProductsPage";
 import { AddStockPage } from "./pages/AddStock";
+import { RemoveStockPage } from "./pages/RemoveStock";
+import { TransferStockPage } from "./pages/TransferStock";
+import { QuickCountPage } from "./pages/QuickCount";
 import { useAuthStore } from "./stores/authStore";
 
 function ComingSoon({ label }: { label: string }) {
@@ -100,15 +103,9 @@ function InventoryPage() {
         <Routes>
           <Route index element={<Navigate to="add" replace />} />
           <Route path="add" element={<AddStockPage embedded />} />
-          <Route path="remove" element={<ComingSoon label="Remove Stock" />} />
-          <Route
-            path="transfer"
-            element={<ComingSoon label="Transfer Stock" />}
-          />
-          <Route
-            path="quickcount"
-            element={<ComingSoon label="Quick Count" />}
-          />
+          <Route path="remove" element={<RemoveStockPage embedded />} />
+          <Route path="transfer" element={<TransferStockPage embedded />} />
+          <Route path="quickcount" element={<QuickCountPage embedded />} />
         </Routes>
       </div>
     </div>

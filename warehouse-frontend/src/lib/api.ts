@@ -35,20 +35,22 @@ async function withAuthHandling<T>(request: Promise<T>): Promise<T> {
   }
 }
 
+async function getAuthHeaders() {
+  const token = localStorage.getItem("session_token");
+  const headers: Record<string, string> = {};
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 const apiClient = new WarehouseClient({
   BASE: "",
   WITH_CREDENTIALS: true,
   CREDENTIALS: "include",
-  HEADERS: async () => {
-    const token = localStorage.getItem("session_token");
-    const headers: Record<string, string> = {};
-
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    return headers;
-  },
+  HEADERS: getAuthHeaders,
 });
 
 export const client = {
@@ -78,6 +80,35 @@ export const client = {
       quantity: number;
       bin_id?: string;
     }) => withAuthHandling(apiClient.inventory.addStock({ requestBody: data })),
+    countAdjust: (data: {
+      warehouse_id: string;
+      item_id: string;
+      observed_quantity: number;
+      bin_id?: string;
+    }) =>
+      withAuthHandling(apiClient.inventory.countAdjust({ requestBody: data })),
+    removeStock: (data: {
+      warehouse_id: string;
+      item_id: string;
+      quantity: number;
+      bin_id?: string;
+      owner_override?: boolean;
+      request_owner_approval?: boolean;
+    }) =>
+      withAuthHandling(
+        apiClient.inventory.removeStock({ requestBody: data as any }),
+      ),
+    transferStock: (data: {
+      item_id: string;
+      quantity: number;
+      source_warehouse_id: string;
+      dest_warehouse_id: string;
+      source_bin_id?: string;
+      dest_bin_id?: string;
+    }) =>
+      withAuthHandling(
+        apiClient.inventory.transferStock({ requestBody: data }),
+      ),
     getBalance: (filters?: {
       warehouse_id?: string;
       bin_id?: string;
@@ -89,6 +120,16 @@ export const client = {
           binId: filters?.bin_id,
           itemId: filters?.item_id,
         }),
+      ),
+    getRemovalApprovals: () =>
+      withAuthHandling(apiClient.inventory.getRemovalApprovals()),
+    approveRemovalApproval: (approvalId: string) =>
+      withAuthHandling(
+        apiClient.inventory.approveRemovalApproval({ id: approvalId }),
+      ),
+    rejectRemovalApproval: (approvalId: string) =>
+      withAuthHandling(
+        apiClient.inventory.rejectRemovalApproval({ id: approvalId }),
       ),
   },
   items: {

@@ -157,3 +157,42 @@ export function useTransferStock() {
 ## Conversation
 
 ### user
+
+Repair the Flow 3 transfer-stock implementation in the west workspace based on these QA findings:
+
+1. The Transfer tab can reject a valid transfer before the source-balance query finishes loading because availability defaults to 0. Fix this functional bug narrowly.
+2. The checked-in contract artifacts are stale for the transfer endpoint: backend route/frontend client exist but `warehouse-backend/openapi.json` does not include `/api/inventory/transfer`. Bring the checked-in contract artifacts back into sync as narrowly as possible for this slice.
+
+Do not broaden scope into test harness or unrelated coverage work. Update the task history if your workflow expects it. Return a concise summary of changes, validation, and remaining risks.
+
+### agent
+
+Applied a narrow Flow 3 repair.
+
+- Frontend: guarded transfer submission while the source-balance query is still settling so the form no longer compares a valid quantity against the pre-load `0` fallback. The availability copy and submit disabled state now reflect that in-flight check.
+- Contract artifact: added the missing `/api/inventory/transfer` entry to `warehouse-backend/openapi.json` with the checked-in request/response schema shape already implemented by the backend route.
+
+Validation in this pass: editor diagnostics on the touched frontend file and the task/openapi file set after the patch. Not run here: backend tests, frontend tests, or OpenAPI export/codegen commands.
+
+Remaining risk: `openapi.json` is now back in sync for this transfer slice, but it was updated manually here rather than regenerated from the export script.
+
+### user
+
+Implement this dependency slice after remove stock: add backend transfer movement support plus the frontend transfer workflow under the Inventory page Transfer tab. Keep it minimal but complete, follow repo conventions, and report validation and any blockers.
+
+### agent
+
+Implemented the transfer slice end-to-end.
+
+- Backend: added `POST /api/inventory/transfer` in `warehouse-backend/src/routes/inventory.ts` with DFD-aligned request/response schemas, warehouse/item/bin validation, same-warehouse rejection, insufficient-stock rejection at `422`, and a single `TRANSFER` movement written inside a transaction with advisory locks around the source and destination inventory scopes.
+- Frontend: added `useTransferStock()` in `warehouse-frontend/src/hooks/queries/useInventory.ts`, wired `client.inventory.transferStock()` in `warehouse-frontend/src/lib/api.ts`, extended the generated inventory service with the transfer call, and replaced the Transfer placeholder in `warehouse-frontend/src/App.tsx` with a real `TransferStockPage`.
+- UI: the new transfer page resolves items by barcode or item id, enforces distinct source/destination warehouses, conditionally shows source and destination bin selectors based on each warehouse's `use_bins` flag, shows source availability context before submit, blocks duplicate submits while pending, and clears the actionable fields after a successful transfer.
+
+Validation performed in this implementation pass:
+
+- `get_errors` on `warehouse-backend/src/routes/inventory.ts` after the backend edit, including one follow-up fix for the `422` error path.
+- `get_errors` on the touched frontend files: `warehouse-frontend/src/hooks/queries/useInventory.ts`, `warehouse-frontend/src/lib/api.ts`, `warehouse-frontend/src/generated-api/services/InventoryService.ts`, `warehouse-frontend/src/App.tsx`, and `warehouse-frontend/src/pages/TransferStock.tsx`.
+
+Not run here: backend tests, frontend tests, API codegen command, or OpenAPI export command.
+
+### user

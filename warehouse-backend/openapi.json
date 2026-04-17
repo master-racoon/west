@@ -2132,6 +2132,553 @@
         }
       }
     },
+    "/api/inventory/remove": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "operationId": "removeStock",
+        "summary": "Remove stock from a warehouse",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "warehouse_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "item_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "bin_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "owner_override": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "request_owner_approval": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "warehouse_id",
+                  "item_id",
+                  "quantity"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stock movement created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "movement_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "item_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "warehouse_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "bin_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "quantity_removed": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "balance_after": {
+                      "type": "integer"
+                    },
+                    "owner_override_applied": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "movement_id",
+                    "item_id",
+                    "warehouse_id",
+                    "quantity_removed",
+                    "balance_after",
+                    "owner_override_applied"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner override required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Insufficient stock requires owner approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    },
+                    "warning": {
+                      "type": "string"
+                    },
+                    "owner_approval_required": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "approval_requested": {
+                      "type": "boolean"
+                    },
+                    "approval_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "approval_status": {
+                      "type": "string",
+                      "enum": [
+                        "pending"
+                      ]
+                    },
+                    "current_balance": {
+                      "type": "integer"
+                    },
+                    "requested_quantity": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "shortfall": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "warning",
+                    "owner_approval_required",
+                    "approval_requested",
+                    "current_balance",
+                    "requested_quantity",
+                    "shortfall"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/transfer": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "operationId": "transferStock",
+        "summary": "Transfer stock between warehouses",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "item_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "source_warehouse_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "dest_warehouse_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "source_bin_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "dest_bin_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "item_id",
+                  "quantity",
+                  "source_warehouse_id",
+                  "dest_warehouse_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transfer movement created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "movement_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "item_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "quantity": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "source_warehouse_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "dest_warehouse_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "source_balance_after": {
+                      "type": "integer"
+                    },
+                    "dest_balance_after": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "movement_id",
+                    "item_id",
+                    "quantity",
+                    "source_warehouse_id",
+                    "dest_warehouse_id",
+                    "source_balance_after",
+                    "dest_balance_after"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Insufficient stock",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/count-adjust": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "operationId": "countAdjust",
+        "summary": "Adjust inventory to a physical count",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "warehouse_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "bin_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "item_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "observed_quantity": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "warehouse_id",
+                  "item_id",
+                  "observed_quantity"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Count adjustment movement created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "movement_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "item_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "previous_balance": {
+                      "type": "integer"
+                    },
+                    "new_balance": {
+                      "type": "integer"
+                    },
+                    "delta": {
+                      "type": "integer"
+                    },
+                    "movement_type": {
+                      "type": "string",
+                      "enum": [
+                        "COUNT_ADJUSTMENT"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "movement_id",
+                    "item_id",
+                    "previous_balance",
+                    "new_balance",
+                    "delta",
+                    "movement_type"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inventory/balance": {
       "get": {
         "tags": [
@@ -2206,6 +2753,396 @@
           },
           "401": {
             "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/removal-approvals": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "operationId": "getRemovalApprovals",
+        "summary": "List shortfall removal approvals visible to the current user",
+        "responses": {
+          "200": {
+            "description": "Visible removal approvals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "item_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "item_name": {
+                        "type": "string"
+                      },
+                      "warehouse_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "warehouse_name": {
+                        "type": "string"
+                      },
+                      "bin_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "bin_name": {
+                        "type": "string"
+                      },
+                      "quantity_requested": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "current_balance": {
+                        "type": "integer"
+                      },
+                      "shortfall": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "approved",
+                          "rejected"
+                        ]
+                      },
+                      "requested_by_user_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "requested_by_name": {
+                        "type": "string"
+                      },
+                      "approved_by_owner_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "approved_by_owner_name": {
+                        "type": "string"
+                      },
+                      "movement_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "decided_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "item_id",
+                      "item_name",
+                      "warehouse_id",
+                      "warehouse_name",
+                      "quantity_requested",
+                      "current_balance",
+                      "shortfall",
+                      "status",
+                      "requested_by_user_id",
+                      "requested_by_name",
+                      "created_at"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/removal-approvals/{id}/approve": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "operationId": "approveRemovalApproval",
+        "summary": "Approve a shortfall removal request",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removal approval processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "approval_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rejected"
+                      ]
+                    },
+                    "movement_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "decided_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "approval_id",
+                    "status",
+                    "decided_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Approval not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Approval already processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inventory/removal-approvals/{id}/reject": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "operationId": "rejectRemovalApproval",
+        "summary": "Reject a shortfall removal request",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removal approval rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "approval_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rejected"
+                      ]
+                    },
+                    "movement_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "decided_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "approval_id",
+                    "status",
+                    "decided_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Approval not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Approval already processed",
             "content": {
               "application/json": {
                 "schema": {

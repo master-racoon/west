@@ -14,8 +14,6 @@ applyTo: "**/*.ts"
 4. Create TanStack Query hook in `warehouse-frontend/src/hooks/queries/`
 5. Build page/component using the hook
 
-
-
 ## Dev Workflow
 
 ```bash
@@ -44,7 +42,6 @@ npm run db:migrate:prod  # Apply to production
 **Backend** (`make test-backend`): Canonical DB-backed backend integration test flow. It starts the compose test stack, applies backend migrations, and runs Vitest against the isolated test database. Helpers in `src/tests/helpers.ts` (`clearDatabase()`, `signupUser()`).
 
 **E2E** (`make test-e2e`): Playwright tests in `warehouse-frontend/e2e/`. Full Docker stack. Auth setup in `auth.setup.ts`.
-
 
 ## Common Pitfalls
 

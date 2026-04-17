@@ -2,7 +2,7 @@
 title: "[DEV] US-3.1 Scan and Remove Stock from Warehouse"
 lane: todo
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-04T00:00:00Z
+updated: 2026-04-16T00:00:00Z
 description: "User removes quantity from warehouse with owner override for negative stock"
 labels:
   - flow-2-remove-stock
@@ -156,3 +156,9 @@ export function useRemoveStock() {
 ## Conversation
 
 ### user
+
+### assistant
+
+Implemented the remove-stock vertical slice already present in the worktree through to the contract artifacts: backend remove and approval routes plus schema/migrations are in place, the Inventory page Remove tab is wired to the dedicated remove workflow, and the generated inventory client/OpenAPI export now include the shortfall approval endpoints so frontend code no longer has to bypass the generated contract.
+
+Adjusted Flow 2 shortfall behavior so the first insufficient-stock submit only returns the guided warning branch, explicit owner-request actions now reuse any matching pending approval instead of creating duplicates, and the requester approvals list polls while pending items exist so later owner decisions are more likely to appear without a full refresh.
