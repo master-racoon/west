@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
 export interface UserName {
   id: string;
   name: string;
@@ -28,7 +30,7 @@ export function useUserNames() {
   return useQuery<UserName[]>({
     queryKey: ["userNames"],
     queryFn: async () => {
-      const res = await fetch("/api/users/names");
+      const res = await fetch(`${API_BASE}/api/users/names`);
       if (!res.ok) throw new Error("Failed to fetch user names");
       return res.json();
     },
@@ -40,7 +42,9 @@ export function useUsers() {
   return useQuery<User[]>({
     queryKey: ["users"],
     queryFn: async () => {
-      const res = await fetch("/api/users", { headers: await getHeaders() });
+      const res = await fetch(`${API_BASE}/api/users`, {
+        headers: await getHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     },
@@ -51,7 +55,7 @@ export function useCreateUser() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: { name: string; pin: string }) => {
-      const res = await fetch("/api/users", {
+      const res = await fetch(`${API_BASE}/api/users`, {
         method: "POST",
         headers: await getHeaders(),
         body: JSON.stringify(data),

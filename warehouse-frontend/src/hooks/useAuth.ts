@@ -2,9 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
 async function fetchSession() {
   const token = localStorage.getItem("session_token");
-  const response = await fetch("/api/auth/session", {
+  const response = await fetch(`${API_BASE}/api/auth/session`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) throw new Error("Failed to fetch session");
@@ -37,7 +39,7 @@ export function useAuth() {
 
   const logout = async () => {
     const token = localStorage.getItem("session_token");
-    await fetch("/api/auth/logout", {
+    await fetch(`${API_BASE}/api/auth/logout`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });

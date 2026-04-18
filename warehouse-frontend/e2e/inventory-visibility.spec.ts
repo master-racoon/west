@@ -13,8 +13,7 @@ type Page = Parameters<typeof test>[0]["page"];
 async function searchInventory(page: Page, query: string) {
   // Set up the response listener BEFORE typing so we don't miss it
   const responsePromise = page.waitForResponse(
-    (resp) =>
-      resp.url().includes("/api/items/search") && resp.status() === 200,
+    (resp) => resp.url().includes("/api/items/search") && resp.status() === 200,
     { timeout: 15000 },
   );
   await page
@@ -55,7 +54,9 @@ test.describe("Inventory Visibility", () => {
     ).toBeVisible();
   });
 
-  test("shows no items found for unrecognised search term", async ({ page }) => {
+  test("shows no items found for unrecognised search term", async ({
+    page,
+  }) => {
     await loginAsOwner(page);
     await page.goto("/dashboard/inventory-visibility");
     await searchInventory(page, "xyzNonExistentItem99999");
@@ -80,7 +81,9 @@ test.describe("Inventory Visibility", () => {
     await page.goto("/dashboard/inventory-visibility");
     await searchInventory(page, itemName);
 
-    const resultButton = page.getByRole("button", { name: new RegExp(itemName) });
+    const resultButton = page.getByRole("button", {
+      name: new RegExp(itemName),
+    });
     await expect(resultButton).toBeVisible();
     await resultButton.click();
 
@@ -104,7 +107,9 @@ test.describe("Inventory Visibility", () => {
     await page.goto("/dashboard/inventory-visibility");
     await searchInventory(page, itemName);
 
-    const resultButton = page.getByRole("button", { name: new RegExp(itemName) });
+    const resultButton = page.getByRole("button", {
+      name: new RegExp(itemName),
+    });
     await expect(resultButton).toBeVisible();
     await resultButton.click();
 
@@ -131,7 +136,9 @@ test.describe("Inventory Visibility", () => {
     await page.goto("/dashboard/inventory-visibility");
     await searchInventory(page, itemName);
 
-    const resultButton = page.getByRole("button", { name: new RegExp(itemName) });
+    const resultButton = page.getByRole("button", {
+      name: new RegExp(itemName),
+    });
     await expect(resultButton).toBeVisible();
     await resultButton.click();
 
@@ -222,7 +229,9 @@ test.describe("Inventory Visibility", () => {
     await page.goto("/dashboard/inventory-visibility");
     await searchInventory(page, itemName);
 
-    const resultButton = page.getByRole("button", { name: new RegExp(itemName) });
+    const resultButton = page.getByRole("button", {
+      name: new RegExp(itemName),
+    });
     await expect(resultButton).toBeVisible();
     await resultButton.click();
 
@@ -233,6 +242,8 @@ test.describe("Inventory Visibility", () => {
     // Movement History tab: movement with type "Add" and qty 10
     await page.getByRole("button", { name: "Movement History" }).click();
     await expect(page.getByRole("cell", { name: "Add" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "10", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("cell", { name: "10", exact: true }),
+    ).toBeVisible();
   });
 });
