@@ -136,6 +136,46 @@ const listBinsByWarehouseRoute = createRoute({
   },
 });
 
+const updateBinRoute = createRoute({
+  method: "patch",
+  path: "/{id}",
+  tags: ["Bins"],
+  operationId: "updateBin",
+  summary: "Rename a bin",
+  request: {
+    params: IdParams,
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({ name: z.string().min(1).max(100) }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Bin updated",
+      content: { "application/json": { schema: BinResponse } },
+    },
+    400: {
+      description: "Invalid request",
+      content: { "application/json": { schema: ErrorResponse } },
+    },
+    403: {
+      description: "Owner role required",
+      content: { "application/json": { schema: ErrorResponse } },
+    },
+    404: {
+      description: "Bin not found",
+      content: { "application/json": { schema: ErrorResponse } },
+    },
+    409: {
+      description: "Bin name already exists",
+      content: { "application/json": { schema: ErrorResponse } },
+    },
+  },
+});
+
 const getBinRoute = createRoute({
   method: "get",
   path: "/{id}",
@@ -285,6 +325,58 @@ warehouseBinsRouter.openapi(listBinsByWarehouseRoute, async (c) => {
     .where(eq(bin.warehouse_id, warehouseId));
 
   return c.json(bins.map(toBinResponse), 200);
+});
+
+// PATCH /api/bins/:id - Rename a bin
+binsRouter.openapi(updateBinRoute, async (c) => {
+  requireRole(c, "owner");
+
+  const { id: binId } = c.req.valid("param");
+  const { name } = c.req.valid("json");
+
+  const db = c.get("db");
+
+  // Fetch existing bin
+  const existing = await db
+    .select()
+    .from(bin)
+    .where(eq(bin.id, binId))
+    .limit(1);
+
+  if (existing.length === 0) {
+    throw new NotFoundError("Bin not found");
+  }
+
+  // Check uniqueness within the warehouse (case-insensitive), excluding self
+  const duplicate = await db
+    .select()
+    .from(bin)
+    .where(
+      and(
+        eq(bin.warehouse_id, existing[0].warehouse_id),
+        eq(sql`LOWER(${bin.name})`, name.toLowerCase()),
+      ),
+    )
+    .limit(1);
+
+  if (duplicate.length > 0 && duplicate[0].id !== binId) {
+    throw new ConflictError(
+      "Bin with this name already exists in this warehouse",
+    );
+  }
+
+  const result = await db
+    .update(bin)
+    .set({ name, updated_at: new Date() })
+    .where(eq(bin.id, binId))
+    .returning({
+      id: bin.id,
+      warehouse_id: bin.warehouse_id,
+      name: bin.name,
+      created_at: bin.created_at,
+    });
+
+  return c.json(toBinResponse(result[0]), 200);
 });
 
 // GET /api/bins/:id - Get a single bin

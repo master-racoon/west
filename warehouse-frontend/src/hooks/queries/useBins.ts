@@ -40,6 +40,25 @@ export function useBinsByWarehouse(warehouseId: string | undefined) {
   });
 }
 
+export interface RenameBinRequest {
+  id: string;
+  name: string;
+}
+
+export function useRenameBin() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, name }: RenameBinRequest) =>
+      client.bins.renameBin(id, name),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["bins", "warehouse", data.warehouse_id],
+      });
+    },
+  });
+}
+
 export function useBin(binId: string | undefined) {
   return useQuery({
     queryKey: ["bins", "single", binId],

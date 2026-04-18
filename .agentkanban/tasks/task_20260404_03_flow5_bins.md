@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-1.3 Create and Manage Bins (Conditional)"
-lane: todo
+lane: done
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-18T08:03:43.468Z
+updated: 2026-04-18T15:12:00.000Z
 description: Owner creates bins/shelves in warehouses when use_bins=true
 labels:
   - flow-5-configuration
-sortOrder: 10
+sortOrder: 0
 slug: flow5_bins
 ---
 
@@ -129,23 +129,26 @@ export function useBinsByWarehouse(warehouseId: string) {
 
 ### Happy Path
 
-- [ ] Backend: `POST /api/bins` with valid warehouse_id + name → 201, bin created
-- [ ] Backend: `GET /api/warehouses/:id/bins` returns bins for warehouse
-- [ ] Backend: Bin name case-insensitive unique per warehouse
+- [x] Backend: `POST /api/bins` with valid warehouse_id + name → 201, bin created
+- [x] Backend: `GET /api/warehouses/:id/bins` returns bins for warehouse
+- [x] Backend: Bin name case-insensitive unique per warehouse
+- [x] Backend: `PATCH /api/bins/:id` with valid name → 200, bin renamed
 
 ### Error Paths
 
-- [ ] Backend: Warehouse with `use_bins = false` → 400 BadRequest
-- [ ] Backend: Duplicate bin name in same warehouse → 409 Conflict
-- [ ] Backend: Non-existent warehouse_id → 404 or 400
-- [ ] Backend: Non-owner → 403 Forbidden
-- [ ] Frontend: Warehouse selector only shows bins-enabled warehouses
+- [x] Backend: Warehouse with `use_bins = false` → 400 BadRequest
+- [x] Backend: Duplicate bin name in same warehouse → 409 Conflict
+- [x] Backend: Non-existent warehouse_id → 404 or 400
+- [x] Backend: Non-owner → 403 Forbidden
+- [x] Frontend: Warehouse selector only shows bins-enabled warehouses
+- [x] Frontend: Duplicate bin rename attempt shows error inline
 
 ### Edge Cases
 
 - [ ] Backend: Bin name at boundary (1 char, 100 chars)
 - [ ] Backend: Delete warehouse cascades to bins
 - [ ] Frontend: Create bin modal, then refresh list
+- [ ] Frontend: Rename bin, verify query cache invalidates correctly
 
 ---
 
@@ -229,5 +232,43 @@ implement
 - Bin names are case-insensitive at the database level for uniqueness checks
 - Cascading delete ensures bins are removed when warehouse is deleted
 - Ready for database migration and testing
+
+### user
+
+the way to edit bins is not clear in the ui still
+
+### agent
+
+**Bin rename feature implemented. Changes:**
+
+#### Backend API
+
+- ✅ Added `PATCH /api/bins/:id` route to [warehouse-backend/src/routes/bins.ts](../../warehouse-backend/src/routes/bins.ts):
+  - Requires owner role
+  - Validates name (1-100 chars)
+  - Checks uniqueness within warehouse (case-insensitive, excluding self)
+  - Returns BinResponse on success (200 OK)
+  - Error responses: 400 (invalid), 403 (forbidden), 404 (not found), 409 (duplicate name)
+
+#### Frontend API Client
+
+- ✅ Added `updateBin()` method to [warehouse-frontend/src/generated-api/services/BinsService.ts](../../warehouse-frontend/src/generated-api/services/BinsService.ts):
+  - Calls `PATCH /api/bins/{id}` with name in request body
+- ✅ Added `renameBin()` wrapper to [warehouse-frontend/src/lib/api.ts](../../warehouse-frontend/src/lib/api.ts)
+
+- ✅ Added `useRenameBin()` mutation hook to [warehouse-frontend/src/hooks/queries/useBins.ts](../../warehouse-frontend/src/hooks/queries/useBins.ts):
+  - Invalidates bins list for the bin's warehouse on success
+
+#### Frontend UI
+
+- ✅ Updated [warehouse-frontend/src/pages/BinsPage.tsx](../../warehouse-frontend/src/pages/BinsPage.tsx):
+  - Replaced non-functional "• • •" menu button with "Rename" button
+  - Added inline edit mode: clicking "Rename" shows text input with Save/Cancel controls
+  - Enter key saves, Escape cancels
+  - Error messages display inline if rename fails (e.g., duplicate name)
+  - Loading state disables Save button during mutation
+  - Edit state auto-focuses input field
+
+**Result**: Bins list now clearly shows how to edit—click "Rename" button to inline-edit with immediate save/cancel.
 
 ### user

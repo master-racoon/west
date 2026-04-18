@@ -72,6 +72,8 @@ export const client = {
       withAuthHandling(apiClient.bins.getBinsByWarehouse({ warehouseId })),
     getBin: (binId: string) =>
       withAuthHandling(apiClient.bins.getBin({ id: binId })),
+    renameBin: (id: string, name: string) =>
+      withAuthHandling(apiClient.bins.updateBin({ id, requestBody: { name } })),
   },
   inventory: {
     addStock: (data: {

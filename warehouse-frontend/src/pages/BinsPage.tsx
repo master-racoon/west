@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { BinCreate } from "../components/BinCreate";
-import { useBinsByWarehouse } from "../hooks/queries/useBins";
+import { useBinsByWarehouse, useRenameBin } from "../hooks/queries/useBins";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
+import { getApiErrorMessage } from "../lib/api";
 
 export function BinsPage() {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("");
+  const [editingBinId, setEditingBinId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
 
   const warehousesQuery = useWarehouses();
   const binsQuery = useBinsByWarehouse(selectedWarehouseId);
+  const renameMutation = useRenameBin();
 
   // Filter to only warehouses with use_bins = true
   const binsEnabledWarehouses = (warehousesQuery.data || []).filter(
@@ -16,6 +21,32 @@ export function BinsPage() {
 
   const handleWarehouseChange = (warehouseId: string) => {
     setSelectedWarehouseId(warehouseId);
+    setEditingBinId(null);
+  };
+
+  const startEdit = (bin: { id: string; name: string }) => {
+    setEditingBinId(bin.id);
+    setEditName(bin.name);
+    setEditError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingBinId(null);
+    setEditError(null);
+  };
+
+  const saveEdit = async (binId: string) => {
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      setEditError("Name is required");
+      return;
+    }
+    try {
+      await renameMutation.mutateAsync({ id: binId, name: trimmed });
+      setEditingBinId(null);
+    } catch (err) {
+      setEditError(getApiErrorMessage(err, "Failed to rename bin"));
+    }
   };
 
   return (
@@ -123,29 +154,64 @@ export function BinsPage() {
                         {(binsQuery.data || []).map((bin: any) => (
                           <div
                             key={bin.id}
-                            className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                            className="border border-gray-200 rounded-lg p-3"
                           >
-                            <div className="flex justify-between items-start">
+                            {editingBinId === bin.id ? (
                               <div>
-                                <h3 className="font-medium text-gray-900">
-                                  {bin.name}
-                                </h3>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  ID: {bin.id}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  Created:{" "}
-                                  {new Date(
-                                    bin.created_at,
-                                  ).toLocaleDateString()}
-                                </p>
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") saveEdit(bin.id);
+                                    if (e.key === "Escape") cancelEdit();
+                                  }}
+                                  className="block w-full px-2 py-1 border border-blue-400 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                {editError && (
+                                  <p className="text-xs text-red-600 mt-1">
+                                    {editError}
+                                  </p>
+                                )}
+                                <div className="flex gap-2 mt-2">
+                                  <button
+                                    onClick={() => saveEdit(bin.id)}
+                                    disabled={renameMutation.isPending}
+                                    className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEdit}
+                                    className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <button className="text-sm text-gray-500 hover:text-gray-700">
-                                  • • •
+                            ) : (
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h3 className="font-medium text-gray-900">
+                                    {bin.name}
+                                  </h3>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Created:{" "}
+                                    {new Date(
+                                      bin.created_at,
+                                    ).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => startEdit(bin)}
+                                  className="text-xs text-gray-500 hover:text-blue-600 border border-gray-200 rounded px-2 py-1 hover:border-blue-400 transition-colors"
+                                  title="Rename bin"
+                                >
+                                  Rename
                                 </button>
                               </div>
-                            </div>
+                            )}
                           </div>
                         ))}
                       </div>

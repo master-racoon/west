@@ -6,7 +6,126 @@ import {
   useWarehouses,
   type Warehouse,
 } from "../hooks/queries/useWarehouses";
+import { useBinsByWarehouse, useCreateBin, useRenameBin } from "../hooks/queries/useBins";
 import { useAuthStore } from "../stores/authStore";
+
+function WarehouseBinsSection({ warehouseId }: { warehouseId: string }) {
+  const binsQuery = useBinsByWarehouse(warehouseId);
+  const createBin = useCreateBin();
+  const renameBin = useRenameBin();
+
+  const [newBinName, setNewBinName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const [editingBinId, setEditingBinId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const handleAddBin = async () => {
+    const trimmed = newBinName.trim();
+    if (!trimmed) return;
+    setCreateError(null);
+    try {
+      await createBin.mutateAsync({ warehouse_id: warehouseId, name: trimmed });
+      setNewBinName("");
+    } catch (err) {
+      setCreateError(getApiErrorMessage(err, "Failed to create bin"));
+    }
+  };
+
+  const startEdit = (bin: { id: string; name: string }) => {
+    setEditingBinId(bin.id);
+    setEditName(bin.name);
+    setEditError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingBinId(null);
+    setEditError(null);
+  };
+
+  const saveEdit = async (binId: string) => {
+    const trimmed = editName.trim();
+    if (!trimmed) { setEditError("Name is required"); return; }
+    try {
+      await renameBin.mutateAsync({ id: binId, name: trimmed });
+      setEditingBinId(null);
+    } catch (err) {
+      setEditError(getApiErrorMessage(err, "Failed to rename bin"));
+    }
+  };
+
+  if (binsQuery.isLoading) return <p className="mt-3 text-xs text-gray-500">Loading bins...</p>;
+  if (binsQuery.isError) return <p className="mt-3 text-xs text-red-600">Failed to load bins.</p>;
+
+  const bins = binsQuery.data || [];
+
+  return (
+    <div className="mt-3 border-t border-gray-200 pt-3 space-y-2">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bins</p>
+
+      {bins.length === 0 && (
+        <p className="text-xs text-gray-500">No bins yet.</p>
+      )}
+
+      {bins.map((bin: any) => (
+        <div key={bin.id} className="flex items-center gap-2">
+          {editingBinId === bin.id ? (
+            <>
+              <input
+                autoFocus
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveEdit(bin.id);
+                  if (e.key === "Escape") cancelEdit();
+                }}
+                className="flex-1 px-2 py-1 text-sm border border-blue-400 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <button
+                onClick={() => saveEdit(bin.id)}
+                disabled={renameBin.isPending}
+                className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >Save</button>
+              <button
+                onClick={cancelEdit}
+                className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              >Cancel</button>
+            </>
+          ) : (
+            <>
+              <span className="flex-1 text-sm text-gray-800">{bin.name}</span>
+              <button
+                onClick={() => startEdit(bin)}
+                className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
+              >Rename</button>
+            </>
+          )}
+        </div>
+      ))}
+      {editError && <p className="text-xs text-red-600">{editError}</p>}
+
+      <div className="flex items-center gap-2 pt-1">
+        <input
+          type="text"
+          placeholder="New bin name"
+          value={newBinName}
+          onChange={(e) => setNewBinName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleAddBin(); }}
+          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          disabled={createBin.isPending}
+        />
+        <button
+          onClick={handleAddBin}
+          disabled={createBin.isPending || !newBinName.trim()}
+          className="text-xs px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-40"
+        >Add</button>
+      </div>
+      {createError && <p className="text-xs text-red-600">{createError}</p>}
+    </div>
+  );
+}
 
 export function WarehouseCreate() {
   const { user } = useAuthStore();
@@ -287,34 +406,39 @@ export function WarehouseCreate() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {warehouse.name}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Created{" "}
-                        {new Date(warehouse.created_at).toLocaleDateString()}
-                      </p>
-                      {editSuccessId === warehouse.id && (
-                        <p className="mt-1 text-sm text-green-700">
-                          Warehouse updated successfully.
+                  <div>
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {warehouse.name}
                         </p>
-                      )}
+                        <p className="text-sm text-gray-600">
+                          Created{" "}
+                          {new Date(warehouse.created_at).toLocaleDateString()}
+                        </p>
+                        {editSuccessId === warehouse.id && (
+                          <p className="mt-1 text-sm text-green-700">
+                            Warehouse updated successfully.
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-700">
+                          {warehouse.use_bins ? "Bins enabled" : "No bins"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => startEditing(warehouse)}
+                          disabled={updateMutation.isPending}
+                          className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-700">
-                        {warehouse.use_bins ? "Bins enabled" : "No bins"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => startEditing(warehouse)}
-                        disabled={updateMutation.isPending}
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Edit
-                      </button>
-                    </div>
+                    {warehouse.use_bins && (
+                      <WarehouseBinsSection warehouseId={warehouse.id} />
+                    )}
                   </div>
                 )}
               </li>
