@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-5.1 Quick Count and Reconcile Inventory"
-lane: doing
+lane: done
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-18T09:03:50.372Z
+updated: 2026-04-18T10:41:50.500Z
 description: User counts physical items and adjusts inventory to match observation
 labels:
   - flow-4-quick-count
-sortOrder: 1775260800001
+sortOrder: 0.25
 slug: flow4_quick_count
 ---
 

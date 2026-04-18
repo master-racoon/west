@@ -1,10 +1,10 @@
 ---
 title: US-0.3 Scanning capability
-lane: doing
+lane: done
 created: 2026-04-18T09:05:22.684Z
-updated: 2026-04-18T09:05:22.684Z
+updated: 2026-04-18T10:42:16.656Z
 description: Access camera, extract barcode numbers and any text which is then used as a search against items
-sortOrder: 1775260800002
+sortOrder: -1
 slug: scanning_capability
 ---
 

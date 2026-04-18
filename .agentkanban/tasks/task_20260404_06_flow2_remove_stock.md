@@ -1,11 +1,13 @@
 ---
 title: "[DEV] US-3.1 Scan and Remove Stock from Warehouse"
-lane: doing
+lane: done
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-16T00:00:00Z
-description: "User removes quantity from warehouse with owner override for negative stock"
+updated: 2026-04-18T10:41:47.175Z
+description: User removes quantity from warehouse with owner override for negative stock
 labels:
   - flow-2-remove-stock
+sortOrder: 0.5
+slug: flow2_remove_stock
 ---
 
 ## DFD Reference

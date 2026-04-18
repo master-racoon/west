@@ -1,11 +1,13 @@
 ---
 title: "[DEV] US-2.1 Scan and Add Stock to Warehouse"
-lane: doing
+lane: done
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-04T00:00:00Z
-description: "User scans barcode, enters quantity, and adds stock to warehouse"
+updated: 2026-04-18T10:41:45.119Z
+description: User scans barcode, enters quantity, and adds stock to warehouse
 labels:
   - flow-1-add-stock
+sortOrder: 0
+slug: flow1_add_stock
 ---
 
 ## DFD Reference
