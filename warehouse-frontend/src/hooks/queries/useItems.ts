@@ -37,6 +37,14 @@ export function useItemById(itemId: string | null) {
   });
 }
 
+export function useItemSearch(query: string) {
+  return useQuery({
+    queryKey: ["items", "search", query],
+    queryFn: () => client.items.searchItems(query),
+    enabled: query.length > 0,
+  });
+}
+
 export function useCreateItem() {
   const queryClient = useQueryClient();
 

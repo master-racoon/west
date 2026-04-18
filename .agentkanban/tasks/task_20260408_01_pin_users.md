@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-0.2 PIN-Based Multi-User Auth with Owner User Management"
-lane: doing
+lane: done
 created: 2026-04-08T00:00:00Z
-updated: 2026-04-17T00:00:00Z
-description: Add a users table and 4-digit PIN login for personal user accounts. Owner login remains env-based (APP_PASSWORD) for administration only: user management and configuration. Inventory movements must be performed from personal user accounts, not the shared owner account.
+updated: 2026-04-18T09:03:38.055Z
+description: Add a users table and 4-digit PIN login for personal user accounts. Owner login remains env-based (APP_PASSWORD) for.
 labels:
   - platform-auth
-sortOrder: 1.5
+sortOrder: 1
 slug: pin_users
 ---
 

@@ -1,5 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, inArray } from "drizzle-orm";
+import { eq, ilike, inArray, or } from "drizzle-orm";
 import { requireAuth, requireRole } from "../authorization/middleware";
 import { barcode, item } from "../db/schema";
 import { ConflictError, NotFoundError } from "../utils/errors";
@@ -108,6 +108,47 @@ const listItemsRoute = createRoute({
       content: {
         "application/json": {
           schema: ListItemsResponse,
+        },
+      },
+    },
+    401: {
+      description: "Authentication required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const SearchItemsQuery = z.object({
+  q: z.string().min(1).max(200),
+});
+
+const SearchItemsResponse = z.array(
+  z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    description: z.string().optional(),
+  }),
+);
+
+const searchItemsRoute = createRoute({
+  method: "get",
+  path: "/search",
+  tags: ["Items"],
+  operationId: "searchItems",
+  summary: "Search items by name or description",
+  request: {
+    query: SearchItemsQuery,
+  },
+  responses: {
+    200: {
+      description: "Matching items",
+      content: {
+        "application/json": {
+          schema: SearchItemsResponse,
         },
       },
     },
@@ -283,7 +324,9 @@ async function assertBarcodesAvailable(db: any, values: string[]) {
     .limit(1);
 
   if (existing.length > 0) {
-    throw new ConflictError(`Barcode \"${existing[0].barcode}\" already exists`);
+    throw new ConflictError(
+      `Barcode \"${existing[0].barcode}\" already exists`,
+    );
   }
 }
 
@@ -311,7 +354,10 @@ async function getItemRecord(db: any, itemId: string) {
     .where(eq(barcode.item_id, itemId))
     .orderBy(barcode.created_at);
 
-  return toItemResponse(items[0], itemBarcodes.map((entry: { barcode: string }) => entry.barcode));
+  return toItemResponse(
+    items[0],
+    itemBarcodes.map((entry: { barcode: string }) => entry.barcode),
+  );
 }
 
 function toItemResponse(
@@ -409,8 +455,42 @@ itemsRouter.openapi(listItemsRoute, async (c) => {
   }
 
   return c.json(
-    itemRecords.map((record: { id: string; name: string; description: string | null; created_at: Date }) =>
-      toItemResponse(record, barcodesByItemId.get(record.id) || []),
+    itemRecords.map(
+      (record: {
+        id: string;
+        name: string;
+        description: string | null;
+        created_at: Date;
+      }) => toItemResponse(record, barcodesByItemId.get(record.id) || []),
+    ),
+  );
+});
+
+itemsRouter.openapi(searchItemsRoute, async (c) => {
+  requireAuth(c);
+
+  const db = c.get("db");
+  const { q } = c.req.valid("query");
+  const pattern = `%${q}%`;
+
+  const results = await db
+    .select({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+    })
+    .from(item)
+    .where(or(ilike(item.name, pattern), ilike(item.description, pattern)))
+    .orderBy(item.name)
+    .limit(20);
+
+  return c.json(
+    results.map(
+      (record: { id: string; name: string; description: string | null }) => ({
+        id: record.id,
+        name: record.name,
+        ...(record.description ? { description: record.description } : {}),
+      }),
     ),
   );
 });

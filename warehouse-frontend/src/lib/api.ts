@@ -145,6 +145,8 @@ export const client = {
       withAuthHandling(
         apiClient.items.addBarcode({ id: itemId, requestBody: data }),
       ),
+    searchItems: (q: string) =>
+      withAuthHandling(apiClient.items.searchItems({ q })),
   },
   barcodes: {
     lookupItemByBarcode: (barcode: string) =>

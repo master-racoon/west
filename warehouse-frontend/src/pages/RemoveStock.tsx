@@ -10,6 +10,7 @@ import {
 import { useWarehouses } from "../hooks/queries/useWarehouses";
 import { ApiError, client, getApiErrorMessage } from "../lib/api";
 import { useAuthStore } from "../stores/authStore";
+import { ScanOverlay } from "../components/ScanOverlay";
 
 interface ResolvedItem {
   id: string;
@@ -85,6 +86,7 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
   const [isResolvingItem, setIsResolvingItem] = useState(false);
   const [shortfallWarning, setShortfallWarning] =
     useState<ShortfallWarning | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   const warehousesQuery = useWarehouses();
   const removeStockMutation = useRemoveStock();
@@ -197,6 +199,39 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
     setSelectedWarehouseId(warehouseId);
     setSelectedBinId("");
     resetMessages();
+  };
+
+  const handleScanResult = (value: string) => {
+    setBarcodeOrItemId(value);
+    setResolvedItem(null);
+    resetMessages();
+    setShowScanner(false);
+    setTimeout(async () => {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      setIsResolvingItem(true);
+      try {
+        const barcodeResult =
+          await client.barcodes.lookupItemByBarcode(trimmed);
+        setResolvedItem({
+          id: barcodeResult.item_id,
+          name: barcodeResult.item_name,
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          try {
+            const itemResult = await client.items.getItem(trimmed);
+            setResolvedItem({ id: itemResult.id, name: itemResult.name });
+          } catch {
+            setBarcodeError("Item not found");
+          }
+        } else {
+          setBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
+        }
+      } finally {
+        setIsResolvingItem(false);
+      }
+    }, 0);
   };
 
   const handleBarcodeKeyDown = async (
@@ -416,6 +451,14 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
                     disabled={removeStockMutation.isPending}
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(true)}
+                  className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={removeStockMutation.isPending}
+                >
+                  📷 Scan
+                </button>
                 <button
                   type="button"
                   onClick={() => void resolveItem()}
@@ -787,6 +830,14 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
             </div>
           </div>
         </div>
+      )}
+      {showScanner && (
+        <ScanOverlay
+          enableOcr
+          onBarcodeScan={handleScanResult}
+          onTextCapture={handleScanResult}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </>
   );

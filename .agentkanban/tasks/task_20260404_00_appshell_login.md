@@ -18,6 +18,8 @@ slug: appshell_login
 
 **Data Contracts** (Auth Endpoints):
 
+> **Superseded** — The login schema below was extended in [task_20260408_01_pin_users](task_20260408_01_pin_users.md) to a union type (owner password | user PIN). The contracts here reflect the original scaffold; see US-0.2 for the current shape.
+
 - `POST /api/auth/login`
   - Request: `{ password: string (min 8 chars) }`
   - Response (success): `{ session_token: string, user: { id: UUID, role: 'owner' | 'user' } }`

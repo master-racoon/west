@@ -14,6 +14,7 @@ import {
 } from "../hooks/queries/useInventory";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
 import { ApiError, client, getApiErrorMessage } from "../lib/api";
+import { ScanOverlay } from "../components/ScanOverlay";
 
 interface ResolvedItem {
   id: string;
@@ -75,6 +76,7 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
   const [resultSummary, setResultSummary] = useState<CountResultSummary | null>(
     null,
   );
+  const [showScanner, setShowScanner] = useState(false);
 
   const warehousesQuery = useWarehouses();
   const itemsQuery = useItems();
@@ -244,6 +246,37 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
     setSelectedBinId("");
     setResultSummary(null);
     resetMessages();
+  };
+
+  const handleScanResult = (value: string) => {
+    setBarcodeOrItemId(value);
+    setResolvedItem(null);
+    setSelectedItemId("");
+    resetMessages();
+    setShowScanner(false);
+    setTimeout(async () => {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      setIsResolvingItem(true);
+      try {
+        const barcodeResult = await client.barcodes.lookupItemByBarcode(trimmed);
+        setResolvedItem({ id: barcodeResult.item_id, name: barcodeResult.item_name });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          try {
+            const itemResult = await client.items.getItem(trimmed);
+            setResolvedItem({ id: itemResult.id, name: itemResult.name });
+            setSelectedItemId(itemResult.id);
+          } catch {
+            showBarcodeError("Item not found");
+          }
+        } else {
+          showBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
+        }
+      } finally {
+        setIsResolvingItem(false);
+      }
+    }, 0);
   };
 
   const handleBarcodeKeyDown = async (
@@ -464,6 +497,14 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
               </div>
               <button
                 type="button"
+                onClick={() => setShowScanner(true)}
+                className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={countAdjustMutation.isPending}
+              >
+                📷 Scan
+              </button>
+              <button
+                type="button"
                 onClick={() => void resolveItem()}
                 className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={countAdjustMutation.isPending || isResolvingItem}
@@ -564,6 +605,14 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
           </form>
         </section>
       </div>
+      {showScanner && (
+        <ScanOverlay
+          enableOcr
+          onBarcodeScan={handleScanResult}
+          onTextCapture={handleScanResult}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   useItems,
 } from "../hooks/queries/useItems";
 import { useAuthStore } from "../stores/authStore";
+import { ScanOverlay } from "../components/ScanOverlay";
 
 function normalizeBarcodeInputs(values: string[]) {
   return values.map((value) => value.trim()).filter(Boolean);
@@ -44,6 +45,8 @@ export function ProductsPage() {
   const [newBarcodeSuccess, setNewBarcodeSuccess] = useState<string | null>(
     null,
   );
+  const [showAddBarcodeScanner, setShowAddBarcodeScanner] = useState(false);
+  const [showCreateBarcodeScanner, setShowCreateBarcodeScanner] = useState<number | null>(null);
 
   const itemsQuery = useItems();
   const itemQuery = useItemById(selectedItemId);
@@ -347,6 +350,14 @@ export function ProductsPage() {
                       />
                       <button
                         type="button"
+                        onClick={() => setShowCreateBarcodeScanner(index)}
+                        className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                        disabled={createItemMutation.isPending}
+                      >
+                        📷
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => removeBarcodeInput(index)}
                         className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
                         disabled={createItemMutation.isPending}
@@ -549,6 +560,13 @@ export function ProductsPage() {
                         disabled={addBarcodeMutation.isPending}
                       />
                       <button
+                        type="button"
+                        onClick={() => setShowAddBarcodeScanner(true)}
+                        className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        📷
+                      </button>
+                      <button
                         type="submit"
                         className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={addBarcodeMutation.isPending}
@@ -563,6 +581,24 @@ export function ProductsPage() {
           </section>
         </div>
       </div>
+      {showAddBarcodeScanner && (
+        <ScanOverlay
+          onBarcodeScan={(value) => {
+            setNewBarcode(value);
+            setShowAddBarcodeScanner(false);
+          }}
+          onClose={() => setShowAddBarcodeScanner(false)}
+        />
+      )}
+      {showCreateBarcodeScanner !== null && (
+        <ScanOverlay
+          onBarcodeScan={(value) => {
+            handleBarcodeChange(showCreateBarcodeScanner, value);
+            setShowCreateBarcodeScanner(null);
+          }}
+          onClose={() => setShowCreateBarcodeScanner(null)}
+        />
+      )}
     </div>
   );
 }
