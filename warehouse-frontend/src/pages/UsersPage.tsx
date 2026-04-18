@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import {
   useUsers,
@@ -10,7 +10,6 @@ import {
 } from "../hooks/queries/useUsers";
 
 export function UsersPage() {
-  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
@@ -19,8 +18,7 @@ export function UsersPage() {
 
   // Redirect non-owners
   if (user?.role !== "owner") {
-    navigate("/dashboard");
-    return null;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const { data: users, isLoading } = useUsers();

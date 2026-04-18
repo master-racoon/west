@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-1.3 Create and Manage Bins (Conditional)"
-lane: doing
+lane: todo
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-13T14:41:41.109Z
+updated: 2026-04-18T08:03:43.468Z
 description: Owner creates bins/shelves in warehouses when use_bins=true
 labels:
   - flow-5-configuration
-sortOrder: 2
+sortOrder: 10
 slug: flow5_bins
 ---
 

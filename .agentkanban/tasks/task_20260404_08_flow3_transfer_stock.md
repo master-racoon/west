@@ -2,10 +2,12 @@
 title: "[DEV] US-4.1 Transfer Stock Between Warehouses"
 lane: todo
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-04T00:00:00Z
-description: "User transfers quantity of item between warehouses with optional bin selection"
+updated: 2026-04-18T08:04:02.680Z
+description: User transfers quantity of item between warehouses with optional bin selection
 labels:
   - flow-3-transfer-stock
+sortOrder: 9
+slug: flow3_transfer_stock
 ---
 
 ## DFD Reference

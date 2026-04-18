@@ -29,7 +29,7 @@ export const LoginResponse = z.object({
   session_token: z.string(),
   user: z.object({
     id: z.string(),
-    name: z.string(),
+    name: z.string().optional(),
     role: z.enum(["owner", "user"]),
   }),
 });
@@ -39,7 +39,7 @@ export const SessionResponse = z.union([
     authenticated: z.literal(true),
     user: z.object({
       id: z.string(),
-      name: z.string(),
+      name: z.string().optional(),
       role: z.enum(["owner", "user"]),
     }),
   }),
@@ -52,13 +52,13 @@ export const LogoutResponse = z.object({
 
 function toSessionResponseUser(user: SessionUser): {
   id: string;
-  name: string;
+  name?: string;
   role: "owner" | "user";
 } {
   return {
     id: user.id,
-    name: user.name ?? "Unknown",
     role: user.role,
+    ...(user.name ? { name: user.name } : {}),
   };
 }
 
@@ -157,13 +157,12 @@ router.openapi(loginRoute, async (c) => {
   if ("password" in parsed) {
     const appPassword = c.env?.APP_PASSWORD;
     if (!appPassword || parsed.password !== appPassword) {
-      return c.json({ error: "Invalid password" }, 401);
+      return c.json({ error: "Incorrect owner password." }, 401);
     }
     const token = crypto.randomUUID();
     const user: SessionUser = {
       id: "owner-user",
       role: "owner",
-      name: "Owner",
     };
     sessions.set(token, user);
     return c.json(
@@ -185,11 +184,17 @@ router.openapi(loginRoute, async (c) => {
     .where(eq(users.id, user_id))
     .limit(1);
   if (!user) {
-    return c.json({ error: "Invalid credentials" }, 401);
+    return c.json({ error: "Incorrect PIN." }, 401);
   }
 
   if (user.locked_until && user.locked_until > new Date()) {
-    return c.json({ error: "Account locked. Try again later." }, 423);
+    return c.json(
+      {
+        error:
+          "Account locked. Ask an owner to unlock it or try again in 15 minutes.",
+      },
+      423,
+    );
   }
 
   const match = await compare(pin, user.pin_hash);
@@ -202,7 +207,18 @@ router.openapi(loginRoute, async (c) => {
       updatePayload.locked_until = new Date(Date.now() + 15 * 60 * 1000);
     }
     await db.update(users).set(updatePayload).where(eq(users.id, user_id));
-    return c.json({ error: "Invalid credentials" }, 401);
+
+    if (newAttempts >= 5) {
+      return c.json(
+        {
+          error:
+            "Account locked. Ask an owner to unlock it or try again in 15 minutes.",
+        },
+        423,
+      );
+    }
+
+    return c.json({ error: "Incorrect PIN." }, 401);
   }
 
   await db

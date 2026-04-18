@@ -25,6 +25,9 @@ const ErrorResponse = z.object({
   error: z.string(),
 });
 
+const PERSONAL_USER_ACCOUNT_REQUIRED_MESSAGE =
+  "Inventory movements require a personal user account. Sign out of the owner account and sign in with your own PIN.";
+
 export const AddStockRequest = z.object({
   warehouse_id: z.string().uuid(),
   barcode_or_item_id: z.string().trim().min(1).max(200),
@@ -195,6 +198,14 @@ const addStockRoute = createRoute({
         },
       },
     },
+    403: {
+      description: "Personal user account required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
     404: {
       description: "Resource not found",
       content: {
@@ -313,6 +324,14 @@ const transferStockRoute = createRoute({
         },
       },
     },
+    403: {
+      description: "Personal user account required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
     404: {
       description: "Resource not found",
       content: {
@@ -366,6 +385,14 @@ const countAdjustRoute = createRoute({
     },
     401: {
       description: "Authentication required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    403: {
+      description: "Personal user account required",
       content: {
         "application/json": {
           schema: ErrorResponse,
@@ -789,8 +816,18 @@ function getInventoryLockScope(warehouseId: string, binId?: string) {
   return `${warehouseId}:${binId ?? "warehouse"}`;
 }
 
-inventoryRouter.openapi(addStockRoute, async (c) => {
+function requirePersonalMovementAccount(c: Parameters<typeof requireAuth>[0]) {
   const auth = requireAuth(c);
+
+  if (auth.role === "owner") {
+    throw new ForbiddenError(PERSONAL_USER_ACCOUNT_REQUIRED_MESSAGE);
+  }
+
+  return auth;
+}
+
+inventoryRouter.openapi(addStockRoute, async (c) => {
+  const auth = requirePersonalMovementAccount(c);
   const db = c.get("db");
   const data = c.req.valid("json");
   const warehouseRecord = await getWarehouseRecord(db, data.warehouse_id);
@@ -846,7 +883,7 @@ inventoryRouter.openapi(addStockRoute, async (c) => {
 });
 
 inventoryRouter.openapi(removeStockRoute, async (c) => {
-  const auth = requireAuth(c);
+  const auth = requirePersonalMovementAccount(c);
   const db = c.get("db");
   const data = c.req.valid("json");
   const warehouseRecord = await getWarehouseRecord(db, data.warehouse_id);
@@ -871,8 +908,7 @@ inventoryRouter.openapi(removeStockRoute, async (c) => {
     throw new ForbiddenError("Owner role required to override stock shortfall");
   }
 
-  const response = await db.transaction(async (tx: any) => {
-    const removalOutcome = await tx.execute(sql`
+  const removalOutcome = await db.execute(sql`
       WITH stock_lock AS (
         SELECT pg_advisory_xact_lock(
           hashtext(${getInventoryLockScope(warehouseRecord.id, data.bin_id)}),
@@ -950,140 +986,136 @@ inventoryRouter.openapi(removeStockRoute, async (c) => {
       LEFT JOIN inserted ON true
     `);
 
-    const removalRows = Array.isArray(removalOutcome)
-      ? removalOutcome
-      : (removalOutcome.rows ?? []);
-    const removalResult = removalRows[0] as
-      | {
-          current_balance: number | string;
-          requires_override: boolean;
-          shortfall: number | string;
-          owner_override_applied: boolean;
-          movement_id: string | null;
-          override_by_owner: boolean | null;
-        }
-      | undefined;
-
-    if (!removalResult) {
-      throw new Error("Failed to evaluate stock removal");
-    }
-
-    const currentBalance = Number(removalResult.current_balance);
-    const shortfall = Number(removalResult.shortfall);
-    const requiresOverride = Boolean(removalResult.requires_override);
-
-    if (requiresOverride && !removalResult.movement_id) {
-      if (!requestOwnerApproval) {
-        return {
-          body: {
-            success: false as const,
-            warning:
-              "Insufficient stock. Owner approval is required to proceed.",
-            owner_approval_required: true as const,
-            approval_requested: false,
-            current_balance: currentBalance,
-            requested_quantity: data.quantity,
-            shortfall,
-          },
-          status: 422 as const,
-        };
+  const removalRows = Array.isArray(removalOutcome)
+    ? removalOutcome
+    : (removalOutcome.rows ?? []);
+  const removalResult = removalRows[0] as
+    | {
+        current_balance: number | string;
+        requires_override: boolean;
+        shortfall: number | string;
+        owner_override_applied: boolean;
+        movement_id: string | null;
+        override_by_owner: boolean | null;
       }
+    | undefined;
 
-      const pendingCondition = and(
-        eq(removalApproval.user_id, auth.id),
-        eq(removalApproval.item_id, data.item_id),
-        eq(removalApproval.warehouse_id, warehouseRecord.id),
-        eq(removalApproval.quantity_requested, data.quantity),
-        eq(removalApproval.status, "pending"),
-        data.bin_id
-          ? eq(removalApproval.bin_id, data.bin_id)
-          : sql`${removalApproval.bin_id} IS NULL`,
-      );
+  if (!removalResult) {
+    throw new Error("Failed to evaluate stock removal");
+  }
 
-      const pendingApprovals = await tx
-        .select({
-          id: removalApproval.id,
-          status: removalApproval.status,
-        })
-        .from(removalApproval)
-        .where(pendingCondition)
-        .limit(1);
+  const currentBalance = Number(removalResult.current_balance);
+  const shortfall = Number(removalResult.shortfall);
+  const requiresOverride = Boolean(removalResult.requires_override);
 
-      const approvalRecord = pendingApprovals.length
-        ? (
-            await tx
-              .update(removalApproval)
-              .set({
-                current_balance: currentBalance,
-              })
-              .where(eq(removalApproval.id, pendingApprovals[0].id))
-              .returning({
-                id: removalApproval.id,
-                status: removalApproval.status,
-              })
-          )[0]
-        : (
-            await tx
-              .insert(removalApproval)
-              .values({
-                user_id: auth.id,
-                item_id: data.item_id,
-                warehouse_id: warehouseRecord.id,
-                ...(data.bin_id ? { bin_id: data.bin_id } : {}),
-                quantity_requested: data.quantity,
-                current_balance: currentBalance,
-                status: "pending",
-              })
-              .returning({
-                id: removalApproval.id,
-                status: removalApproval.status,
-              })
-          )[0];
-
-      if (!approvalRecord) {
-        throw new Error("Failed to create removal approval");
-      }
-
-      return {
-        body: {
+  if (requiresOverride && !removalResult.movement_id) {
+    if (!requestOwnerApproval) {
+      return c.json(
+        {
           success: false as const,
           warning: "Insufficient stock. Owner approval is required to proceed.",
           owner_approval_required: true as const,
-          approval_requested: true,
-          approval_id: approvalRecord.id,
-          approval_status: approvalRecord.status,
+          approval_requested: false,
           current_balance: currentBalance,
           requested_quantity: data.quantity,
           shortfall,
         },
-        status: 422 as const,
-      };
+        422,
+      );
     }
 
-    if (!removalResult.movement_id) {
-      throw new Error("Failed to create movement");
+    const pendingCondition = and(
+      eq(removalApproval.user_id, auth.id),
+      eq(removalApproval.item_id, data.item_id),
+      eq(removalApproval.warehouse_id, warehouseRecord.id),
+      eq(removalApproval.quantity_requested, data.quantity),
+      eq(removalApproval.status, "pending"),
+      data.bin_id
+        ? eq(removalApproval.bin_id, data.bin_id)
+        : sql`${removalApproval.bin_id} IS NULL`,
+    );
+
+    const pendingApprovals = await db
+      .select({
+        id: removalApproval.id,
+        status: removalApproval.status,
+      })
+      .from(removalApproval)
+      .where(pendingCondition)
+      .limit(1);
+
+    const approvalRecord = pendingApprovals.length
+      ? (
+          await db
+            .update(removalApproval)
+            .set({
+              current_balance: currentBalance,
+            })
+            .where(eq(removalApproval.id, pendingApprovals[0].id))
+            .returning({
+              id: removalApproval.id,
+              status: removalApproval.status,
+            })
+        )[0]
+      : (
+          await db
+            .insert(removalApproval)
+            .values({
+              user_id: auth.id,
+              item_id: data.item_id,
+              warehouse_id: warehouseRecord.id,
+              ...(data.bin_id ? { bin_id: data.bin_id } : {}),
+              quantity_requested: data.quantity,
+              current_balance: currentBalance,
+              status: "pending",
+            })
+            .returning({
+              id: removalApproval.id,
+              status: removalApproval.status,
+            })
+        )[0];
+
+    if (!approvalRecord) {
+      throw new Error("Failed to create removal approval");
     }
 
-    return {
-      body: {
-        success: true as const,
-        movement_id: removalResult.movement_id,
-        item_id: data.item_id,
-        warehouse_id: warehouseRecord.id,
-        ...(data.bin_id ? { bin_id: data.bin_id } : {}),
-        quantity_removed: data.quantity,
-        balance_after: currentBalance - data.quantity,
-        owner_override_applied: Boolean(removalResult.override_by_owner),
+    return c.json(
+      {
+        success: false as const,
+        warning: "Insufficient stock. Owner approval is required to proceed.",
+        owner_approval_required: true as const,
+        approval_requested: true,
+        approval_id: approvalRecord.id,
+        approval_status: approvalRecord.status,
+        current_balance: currentBalance,
+        requested_quantity: data.quantity,
+        shortfall,
       },
-      status: 201 as const,
-    };
-  });
+      422,
+    );
+  }
 
-  return c.json(response.body, response.status);
+  if (!removalResult.movement_id) {
+    throw new Error("Failed to create movement");
+  }
+
+  return c.json(
+    {
+      success: true as const,
+      movement_id: removalResult.movement_id,
+      item_id: data.item_id,
+      warehouse_id: warehouseRecord.id,
+      ...(data.bin_id ? { bin_id: data.bin_id } : {}),
+      quantity_removed: data.quantity,
+      balance_after: currentBalance - data.quantity,
+      owner_override_applied: Boolean(removalResult.override_by_owner),
+    },
+    201,
+  );
 });
 
 inventoryRouter.openapi(transferStockRoute, async (c) => {
-  const auth = requireAuth(c);
+  const auth = requirePersonalMovementAccount(c);
   const db = c.get("db");
   const data = c.req.valid("json");
 
@@ -1127,18 +1159,17 @@ inventoryRouter.openapi(transferStockRoute, async (c) => {
     await getBinRecord(db, destWarehouse.id, data.dest_bin_id);
   }
 
-  const transferResult = await db.transaction(async (tx: any) => {
-    const sourceLockScope = getInventoryLockScope(
-      sourceWarehouse.id,
-      data.source_bin_id,
-    );
-    const destLockScope = getInventoryLockScope(
-      destWarehouse.id,
-      data.dest_bin_id,
-    );
-    const lockScopes = [sourceLockScope, destLockScope].sort();
+  const sourceLockScope = getInventoryLockScope(
+    sourceWarehouse.id,
+    data.source_bin_id,
+  );
+  const destLockScope = getInventoryLockScope(
+    destWarehouse.id,
+    data.dest_bin_id,
+  );
+  const lockScopes = [sourceLockScope, destLockScope].sort();
 
-    const transferOutcome = await tx.execute(sql`
+  const transferOutcome = await db.execute(sql`
       WITH first_lock AS (
         SELECT pg_advisory_xact_lock(
           hashtext(${lockScopes[0]}),
@@ -1253,35 +1284,28 @@ inventoryRouter.openapi(transferStockRoute, async (c) => {
       LEFT JOIN inserted ON true
     `);
 
-    const transferRows = Array.isArray(transferOutcome)
-      ? transferOutcome
-      : (transferOutcome.rows ?? []);
-    const result = transferRows[0] as
-      | {
-          source_balance: number | string;
-          dest_balance: number | string;
-          can_transfer: boolean;
-          movement_id: string | null;
-        }
-      | undefined;
+  const transferRows = Array.isArray(transferOutcome)
+    ? transferOutcome
+    : (transferOutcome.rows ?? []);
+  const transferResult = transferRows[0] as
+    | {
+        source_balance: number | string;
+        dest_balance: number | string;
+        can_transfer: boolean;
+        movement_id: string | null;
+      }
+    | undefined;
 
-    if (!result) {
-      throw new Error("Failed to evaluate stock transfer");
-    }
+  if (!transferResult) {
+    throw new Error("Failed to evaluate stock transfer");
+  }
 
-    const sourceBalance = Number(result.source_balance);
-    const destBalance = Number(result.dest_balance);
+  const sourceBalance = Number(transferResult.source_balance);
+  const destBalance = Number(transferResult.dest_balance);
 
-    if (!result.can_transfer || !result.movement_id) {
-      throw new AppError("Insufficient Stock", 422);
-    }
-
-    return {
-      movement_id: result.movement_id,
-      source_balance_after: sourceBalance - data.quantity,
-      dest_balance_after: destBalance + data.quantity,
-    };
-  });
+  if (!transferResult.can_transfer || !transferResult.movement_id) {
+    throw new AppError("Insufficient Stock", 422);
+  }
 
   return c.json(
     {
@@ -1290,15 +1314,15 @@ inventoryRouter.openapi(transferStockRoute, async (c) => {
       quantity: data.quantity,
       source_warehouse_id: sourceWarehouse.id,
       dest_warehouse_id: destWarehouse.id,
-      source_balance_after: transferResult.source_balance_after,
-      dest_balance_after: transferResult.dest_balance_after,
+      source_balance_after: sourceBalance - data.quantity,
+      dest_balance_after: destBalance + data.quantity,
     },
     201,
   );
 });
 
 inventoryRouter.openapi(countAdjustRoute, async (c) => {
-  const auth = requireAuth(c);
+  const auth = requirePersonalMovementAccount(c);
   const db = c.get("db");
   const data = c.req.valid("json");
   const warehouseRecord = await getWarehouseRecord(db, data.warehouse_id);
@@ -1317,8 +1341,7 @@ inventoryRouter.openapi(countAdjustRoute, async (c) => {
     await getBinRecord(db, warehouseRecord.id, data.bin_id);
   }
 
-  const result = await db.transaction(async (tx: any) => {
-    const adjustmentOutcome = await tx.execute(sql`
+  const adjustmentOutcome = await db.execute(sql`
       WITH stock_lock AS (
         SELECT pg_advisory_xact_lock(
           hashtext(${getInventoryLockScope(warehouseRecord.id, data.bin_id)}),
@@ -1390,37 +1413,29 @@ inventoryRouter.openapi(countAdjustRoute, async (c) => {
       INNER JOIN inserted ON true
     `);
 
-    const adjustmentRows = Array.isArray(adjustmentOutcome)
-      ? adjustmentOutcome
-      : (adjustmentOutcome.rows ?? []);
-    const adjustmentResult = adjustmentRows[0] as
-      | {
-          previous_balance: number | string;
-          new_balance: number | string;
-          delta: number | string;
-          movement_id: string;
-        }
-      | undefined;
+  const adjustmentRows = Array.isArray(adjustmentOutcome)
+    ? adjustmentOutcome
+    : (adjustmentOutcome.rows ?? []);
+  const adjustmentResult = adjustmentRows[0] as
+    | {
+        previous_balance: number | string;
+        new_balance: number | string;
+        delta: number | string;
+        movement_id: string;
+      }
+    | undefined;
 
-    if (!adjustmentResult?.movement_id) {
-      throw new Error("Failed to create count adjustment movement");
-    }
-
-    return {
-      movement_id: adjustmentResult.movement_id,
-      previous_balance: Number(adjustmentResult.previous_balance),
-      new_balance: Number(adjustmentResult.new_balance),
-      delta: Number(adjustmentResult.delta),
-    };
-  });
+  if (!adjustmentResult?.movement_id) {
+    throw new Error("Failed to create count adjustment movement");
+  }
 
   return c.json(
     {
-      movement_id: result.movement_id,
+      movement_id: adjustmentResult.movement_id,
       item_id: data.item_id,
-      previous_balance: result.previous_balance,
-      new_balance: result.new_balance,
-      delta: result.delta,
+      previous_balance: Number(adjustmentResult.previous_balance),
+      new_balance: Number(adjustmentResult.new_balance),
+      delta: Number(adjustmentResult.delta),
       movement_type: "COUNT_ADJUSTMENT" as const,
     },
     201,
@@ -1454,92 +1469,81 @@ inventoryRouter.openapi(approveRemovalApprovalRoute, async (c) => {
     throw new ForbiddenError("Owner role required to approve stock shortfall");
   }
 
-  const decision = await db.transaction(async (tx: any) => {
-    const approvals = await tx
-      .select({
-        id: removalApproval.id,
-        user_id: removalApproval.user_id,
-        item_id: removalApproval.item_id,
-        warehouse_id: removalApproval.warehouse_id,
-        bin_id: removalApproval.bin_id,
-        quantity_requested: removalApproval.quantity_requested,
-        status: removalApproval.status,
-      })
-      .from(removalApproval)
-      .where(eq(removalApproval.id, id))
-      .limit(1);
-
-    if (!approvals.length) {
-      throw new NotFoundError("Removal approval not found");
-    }
-
-    const approval = approvals[0];
-
-    if (approval.status !== "pending") {
-      throw new ConflictError("Removal approval already processed");
-    }
-
-    const updatedApprovals = await tx
-      .update(removalApproval)
-      .set({
-        status: "approved",
-        approved_by_owner: auth.id,
-        decided_at: sql`now()`,
-      })
-      .where(
-        and(eq(removalApproval.id, id), eq(removalApproval.status, "pending")),
+  const result = await db.execute(sql`
+    WITH target AS (
+      SELECT id, status, user_id, item_id, warehouse_id, bin_id, quantity_requested
+      FROM ${removalApproval}
+      WHERE ${removalApproval.id} = ${id}
+    ),
+    updated_approval AS (
+      UPDATE ${removalApproval}
+      SET status = 'approved',
+          approved_by_owner = ${auth.id},
+          decided_at = now()
+      WHERE ${removalApproval.id} = ${id}
+        AND ${removalApproval.status} = 'pending'
+      RETURNING id, status, decided_at, user_id, item_id, warehouse_id, bin_id, quantity_requested
+    ),
+    new_movement AS (
+      INSERT INTO movement (
+        type, user_id, item_id, source_warehouse_id, source_bin_id, quantity, override_by_owner
       )
-      .returning({
-        id: removalApproval.id,
-        status: removalApproval.status,
-        decided_at: removalApproval.decided_at,
-      });
+      SELECT
+        'REMOVE',
+        updated_approval.user_id,
+        updated_approval.item_id,
+        updated_approval.warehouse_id,
+        updated_approval.bin_id,
+        updated_approval.quantity_requested,
+        true
+      FROM updated_approval
+      RETURNING id
+    ),
+    finalized AS (
+      UPDATE ${removalApproval}
+      SET movement_id = new_movement.id
+      FROM new_movement
+      WHERE ${removalApproval.id} = ${id}
+      RETURNING ${removalApproval.id}, ${removalApproval.status}, ${removalApproval.movement_id}, ${removalApproval.decided_at}
+    )
+    SELECT
+      target.status AS original_status,
+      finalized.id,
+      finalized.status,
+      finalized.movement_id,
+      finalized.decided_at
+    FROM target
+    LEFT JOIN finalized ON true
+  `);
 
-    if (!updatedApprovals.length) {
+  const rows = Array.isArray(result) ? result : (result.rows ?? []);
+  const row = rows[0] as
+    | {
+        original_status: string;
+        id: string | null;
+        status: string | null;
+        movement_id: string | null;
+        decided_at: unknown;
+      }
+    | undefined;
+
+  if (!row) {
+    throw new NotFoundError("Removal approval not found");
+  }
+
+  if (!row.id) {
+    if (row.original_status !== "pending") {
       throw new ConflictError("Removal approval already processed");
     }
-
-    const movements = await tx
-      .insert(movement)
-      .values({
-        type: "REMOVE",
-        user_id: approval.user_id,
-        item_id: approval.item_id,
-        source_warehouse_id: approval.warehouse_id,
-        ...(approval.bin_id ? { source_bin_id: approval.bin_id } : {}),
-        quantity: approval.quantity_requested,
-        override_by_owner: true,
-      })
-      .returning({
-        id: movement.id,
-      });
-
-    if (!movements.length) {
-      throw new Error("Failed to create approved removal movement");
-    }
-
-    const finalizedApprovals = await tx
-      .update(removalApproval)
-      .set({
-        movement_id: movements[0].id,
-      })
-      .where(eq(removalApproval.id, id))
-      .returning({
-        id: removalApproval.id,
-        status: removalApproval.status,
-        movement_id: removalApproval.movement_id,
-        decided_at: removalApproval.decided_at,
-      });
-
-    return finalizedApprovals[0];
-  });
+    throw new NotFoundError("Removal approval not found");
+  }
 
   return c.json(
     {
-      approval_id: decision.id,
-      status: decision.status,
-      ...(decision.movement_id ? { movement_id: decision.movement_id } : {}),
-      decided_at: serializeTimestamp(decision.decided_at),
+      approval_id: row.id,
+      status: row.status as "approved" | "pending" | "rejected",
+      ...(row.movement_id ? { movement_id: row.movement_id } : {}),
+      decided_at: serializeTimestamp(row.decided_at),
     },
     200,
   );
@@ -1554,54 +1558,59 @@ inventoryRouter.openapi(rejectRemovalApprovalRoute, async (c) => {
     throw new ForbiddenError("Owner role required to reject stock shortfall");
   }
 
-  const decision = await db.transaction(async (tx: any) => {
-    const approvals = await tx
-      .select({
-        id: removalApproval.id,
-        status: removalApproval.status,
-      })
-      .from(removalApproval)
-      .where(eq(removalApproval.id, id))
-      .limit(1);
+  const result = await db.execute(sql`
+    WITH target AS (
+      SELECT id, status
+      FROM ${removalApproval}
+      WHERE ${removalApproval.id} = ${id}
+    ),
+    updated AS (
+      UPDATE ${removalApproval}
+      SET status = 'rejected',
+          approved_by_owner = ${auth.id},
+          decided_at = now()
+      WHERE ${removalApproval.id} = ${id}
+        AND ${removalApproval.status} = 'pending'
+      RETURNING id, status, movement_id, decided_at
+    )
+    SELECT
+      target.status AS original_status,
+      updated.id,
+      updated.status,
+      updated.movement_id,
+      updated.decided_at
+    FROM target
+    LEFT JOIN updated ON true
+  `);
 
-    if (!approvals.length) {
-      throw new NotFoundError("Removal approval not found");
-    }
+  const rows = Array.isArray(result) ? result : (result.rows ?? []);
+  const row = rows[0] as
+    | {
+        original_status: string;
+        id: string | null;
+        status: string | null;
+        movement_id: string | null;
+        decided_at: unknown;
+      }
+    | undefined;
 
-    if (approvals[0].status !== "pending") {
+  if (!row) {
+    throw new NotFoundError("Removal approval not found");
+  }
+
+  if (!row.id) {
+    if (row.original_status !== "pending") {
       throw new ConflictError("Removal approval already processed");
     }
-
-    const updatedApprovals = await tx
-      .update(removalApproval)
-      .set({
-        status: "rejected",
-        approved_by_owner: auth.id,
-        decided_at: sql`now()`,
-      })
-      .where(
-        and(eq(removalApproval.id, id), eq(removalApproval.status, "pending")),
-      )
-      .returning({
-        id: removalApproval.id,
-        status: removalApproval.status,
-        movement_id: removalApproval.movement_id,
-        decided_at: removalApproval.decided_at,
-      });
-
-    if (!updatedApprovals.length) {
-      throw new ConflictError("Removal approval already processed");
-    }
-
-    return updatedApprovals[0];
-  });
+    throw new NotFoundError("Removal approval not found");
+  }
 
   return c.json(
     {
-      approval_id: decision.id,
-      status: decision.status,
-      ...(decision.movement_id ? { movement_id: decision.movement_id } : {}),
-      decided_at: serializeTimestamp(decision.decided_at),
+      approval_id: row.id,
+      status: row.status as "approved" | "pending" | "rejected",
+      ...(row.movement_id ? { movement_id: row.movement_id } : {}),
+      decided_at: serializeTimestamp(row.decided_at),
     },
     200,
   );

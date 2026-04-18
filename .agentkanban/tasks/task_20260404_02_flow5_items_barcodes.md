@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-1.2 Create and Manage Items with Barcodes"
-lane: doing
+lane: done
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-14T12:00:00.000Z
 description: Owner creates items and assigns multiple barcodes to track SKUs

@@ -1,9 +1,9 @@
 ---
 title: "[DEV] US-0.2 PIN-Based Multi-User Auth with Owner User Management"
-lane: done
+lane: doing
 created: 2026-04-08T00:00:00Z
-updated: 2026-04-13T14:41:22.884Z
-description: Add a users table and 4-digit PIN login for regular users. Owner login remains env-based (APP_PASSWORD). Owner can create, list, delete users, reset their PINs, and unlock accounts via /api/users endpoints and a UsersPage in the frontend.
+updated: 2026-04-17T00:00:00Z
+description: Add a users table and 4-digit PIN login for personal user accounts. Owner login remains env-based (APP_PASSWORD) for administration only: user management and configuration. Inventory movements must be performed from personal user accounts, not the shared owner account.
 labels:
   - platform-auth
 sortOrder: 1.5
@@ -28,21 +28,30 @@ This task introduces:
 
 1. A `users` DB table (id, name, pin_hash, failed_attempts, locked_until, role, created_at).
 2. `GET /api/users/names` — public endpoint returning `[{ id, name }]` for the login dropdown.
-3. `POST /api/auth/login` extended to accept both `{ password }` (owner path, unchanged) and `{ user_id, pin }` (user path, bcrypt lookup with brute-force protection).
+3. `POST /api/auth/login` extended to accept both `{ password }` (owner admin path) and `{ user_id, pin }` (personal user path, bcrypt lookup with brute-force protection).
 4. Five owner-only `/api/users` endpoints for user CRUD, PIN reset, and manual unlock.
 5. Drizzle migration generated and applied.
 6. `LoginPage.tsx` updated: user mode shows a name `<select>` (from `GET /api/users/names`) + 4-digit PIN input; toggle switches to owner password input.
 7. New `UsersPage.tsx` (owner-only) at `/dashboard/users`.
 8. "Users" entry added to `SideMenu` (owner-only, first item, hidden for role `'user'`).
 9. New TanStack Query hook `useUsers.ts` (including public `useUserNames()`).
+10. Shared owner login explicitly treated as an administration-only identity, not a stock-movement identity.
 
 **Design constraints**:
 
 - No email, no password-reset flows — family-team app.
 - PIN is 4 decimal digits (`/^\d{4}$/`). Non-unique PINs are allowed — user is identified by UUID from the dropdown, not by PIN alone.
 - Owner identity is env-based only; the `users` table only holds role `'user'` rows.
+- Shared owner login is for administration only. It can manage users and configuration, but it must not be used for add/remove/transfer/count inventory actions.
+- Every inventory movement must be attributable to a personal PIN-backed user row (`users.id` UUID). If an owner also needs to move stock, they must sign in with their own personal user account.
+- When the shared owner account is blocked from a movement flow, the message must be explicit: `Inventory movements require a personal user account. Sign out of the owner account and sign in with your own PIN.`
 - bcrypt cost factor: 10.
 - Brute-force protection: lock account for 15 minutes after 5 consecutive wrong PIN attempts.
+
+**Downstream policy impact**:
+
+- Existing and future movement routes/pages must treat `role === 'owner'` as admin-only and reject movement writes with the explicit message above.
+- This auth ticket establishes the identity model; movement-task tickets must enforce the restriction in both backend authorization and frontend navigation/UX.
 
 ---
 
@@ -107,7 +116,7 @@ const LoginRequest = z.union([OwnerLoginRequest, UserLoginRequest]);
 ```
 
 - **Dispatch logic**:
-  - If `'password' in body` → owner path: compare against `APP_PASSWORD` env var, return `{ session_token, user: { id: 'owner-user', role: 'owner' } }` (existing code, no change).
+  - If `'password' in body` → owner path: compare against `APP_PASSWORD` env var, return `{ session_token, user: { id: 'owner-user', role: 'owner' } }`. This shared owner identity is administration-only and must not be accepted by movement flows.
   - If `'user_id' in body` → user path: fetch user by `user_id`, check lockout (`locked_until > NOW()` → `423 Locked`), bcrypt-compare `pin` against `pin_hash`. On mismatch: increment `failed_attempts`; if >= 5 set `locked_until = NOW() + 15min`; return `401`. On match: reset `failed_attempts = 0`, `locked_until = NULL`, return session.
 - **Response on success** (both paths):
 
@@ -122,12 +131,14 @@ const LoginResponse = z.object({
 });
 ```
 
-- **Response on failure**: `{ error: "Invalid credentials" }` status `401`.
+- **Response on failure**:
+  - Owner wrong password → `401` with `{ error: "Incorrect owner password." }`
+  - Wrong PIN / stale `user_id` → `401` with `{ error: "Incorrect PIN." }`
 - **Error cases**:
-  - `user_id` not found → `401`
-  - Wrong PIN → `401` (+ lockout tracking)
-  - Account locked → `423` with `{ error: "Account locked. Try again later." }`
-  - Malformed body (neither `password` nor `user_id`+`pin`) → `400`
+  - `user_id` not found → `401` with `{ error: "Incorrect PIN." }`
+  - Wrong PIN → `401` with `{ error: "Incorrect PIN." }` (+ lockout tracking)
+  - Account locked → `423` with `{ error: "Account locked. Ask an owner to unlock it or try again in 15 minutes." }`
+  - Malformed body (neither `password` nor `user_id`+`pin`) → `400` with `{ error: "Choose owner password login or user PIN login." }`
 
 ---
 
@@ -222,7 +233,7 @@ const ResetPinRequest = z.object({
 
 File: `warehouse-backend/src/db/schema.ts`
 
-- Add `users` table as above (with `pin` unique column + `pin_hash`).
+- Add `users` table exactly as above. Do not add a plaintext `pin` column or any uniqueness constraint on PIN data.
 - Run `npm run db:generate` and `npm run db:migrate`.
 
 ### Slice 2 — Backend Auth Route Update
@@ -230,8 +241,8 @@ File: `warehouse-backend/src/db/schema.ts`
 File: `warehouse-backend/src/routes/auth.ts`
 
 - Replace `LoginRequest` Zod schema with `z.union([OwnerLoginRequest, UserLoginRequest])`.
-- Add dispatch: if `'pin' in body` → query `users` table, iterate bcrypt comparisons, return session on match.
-- Owner path: unchanged.
+- Add dispatch: if `'user_id' in body` → query `users` by `user_id`, compare the submitted PIN against that row's `pin_hash`, then apply lockout rules.
+- Owner path remains env-password based, but the returned owner session must be treated as admin-only by downstream movement flows.
 
 ### Slice 3 — Backend `/api/users` Route
 
@@ -240,7 +251,7 @@ File: `warehouse-backend/src/routes/users.ts` (new file)
 - `POST /` — create user (hash PIN, insert, return user without `pin_hash`).
 - `GET /` — list users.
 - `DELETE /:id` — delete user.
-- `PUT /:id/pin` — reset PIN (rehash, update both `pin` and `pin_hash`).
+- `PUT /:id/pin` — reset PIN (rehash and update `pin_hash`; also clear lockout state).
 - Mount at `/api/users` in `warehouse-backend/src/app.ts` behind `requireOwner` middleware.
 
 ### Slice 4 — Frontend LoginPage Update
@@ -255,8 +266,9 @@ File: `warehouse-frontend/src/pages/LoginPage.tsx`
     - 4-digit PIN input (`type="text"` `maxLength={4}` `inputMode="numeric"`).
     - "Login" button.
 - Toggle link: "Login as owner" / "Back to PIN login" below the form.
+- Owner mode includes helper copy that it is for administration only; stock movements require a personal PIN-backed user account.
 - Send `{ password }` or `{ user_id, pin }` accordingly.
-- On `423`: show "Account locked. Try again later."
+- On `423`: show "Account locked. Ask an owner to unlock it or try again in 15 minutes."
 - Store `session_token` + `user` (id, name, role) in Zustand store.
 
 ### Slice 5 — Frontend `useUsers.ts` Hook
@@ -284,7 +296,7 @@ File: `warehouse-frontend/src/pages/UsersPage.tsx` (new file)
 - Displays user list table: name, created_at, actions column.
 - "Add User" button opens inline form (or simple modal): name input + 4-digit PIN input.
   - Validation: name non-empty, PIN exactly 4 digits.
-  - On submit: `useCreateUser()` mutation; show inline error on conflict.
+  - On submit: `useCreateUser()` mutation; show inline validation/server error message.
 - Per-row "Delete" button → `confirm()` dialog → `useDeleteUser()` mutation.
 - Per-row "Reset PIN" button → `prompt()` for new PIN → `useResetPin()` mutation.
 - Loading and empty states.
@@ -316,24 +328,28 @@ File: `warehouse-frontend/src/components/SideMenu.tsx`
 10. `DELETE /api/users/:id` as owner for existing user → `200 { success: true }`, row gone.
 11. `DELETE /api/users/:id` for unknown id → `404`.
 12. `PUT /api/users/:id/pin` with valid new PIN → `200 { success: true }`, new PIN authenticates.
-13. `PUT /api/users/:id/pin` with duplicate PIN → `409`.
+13. `PUT /api/users/:id/pin` with the same PIN as another user remains allowed because PIN uniqueness is not enforced.
+14. Any movement-writing route that receives the shared owner session is rejected with `403` and `{ error: "Inventory movements require a personal user account. Sign out of the owner account and sign in with your own PIN." }`.
 
 ### Frontend
 
-14. `LoginPage` defaults to PIN mode; dropdown populated from `GET /api/users/names`.
-15. Owner toggle switches to password input.
-16. PIN input accepts only 4 numeric digits (validation before submit).
-17. Locked account shows "Account locked. Try again later."
-18. On PIN login success, Zustand store holds `{ id, name, role: 'user' }`.
-19. "Users" menu item visible for owner, hidden for role `'user'`.
-20. `UsersPage` lists users; "Add User" form creates a user and refreshes list.
-21. "Delete" with confirm removes user from list.
-22. "Reset PIN" prompts for new PIN, updates successfully.
-23. "Unlock" button appears for locked users, resets `failed_attempts`.
+15. `LoginPage` defaults to PIN mode; dropdown populated from `GET /api/users/names`.
+16. Owner toggle switches to password input.
+17. Owner mode explicitly says the shared owner login is for administration only and that stock movements require a personal user account.
+18. PIN input accepts only 4 numeric digits (validation before submit).
+19. Locked account shows "Account locked. Ask an owner to unlock it or try again in 15 minutes."
+20. On PIN login success, Zustand store holds `{ id, name, role: 'user' }`.
+21. "Users" menu item visible for owner, hidden for role `'user'`.
+22. `UsersPage` lists users; "Add User" form creates a user and refreshes list.
+23. "Delete" with confirm removes user from list.
+24. "Reset PIN" prompts for new PIN, updates successfully.
+25. "Unlock" button appears for locked users, resets `failed_attempts`.
+26. Movement entry points elsewhere in the UI must not treat the shared owner session as an operator identity; if shown at all, they must surface the same explicit admin-only message.
 
 ### E2E
 
-24. Owner logs in (password) → navigates to Users → creates user (name="Alice", PIN="1234") → logs out → login dropdown shows "Alice" → enters PIN "1234" → dashboard renders → "Users" menu item is absent.
+27. Owner logs in (password) → login UI shows admin-only helper text → navigates to Users → creates user (name="Alice", PIN="1234") → logs out → login dropdown shows "Alice" → enters PIN "1234" → dashboard renders → "Users" menu item is absent.
+28. Shared owner session attempting to enter a movement flow is blocked with `Inventory movements require a personal user account. Sign out of the owner account and sign in with your own PIN.`
 
 ---
 
@@ -355,5 +371,33 @@ Task created as `task_20260408_01_pin_users.md`. See todo file at `todo_20260408
 - Backend: `users` table (with `failed_attempts`, `locked_until`) + extended `POST /api/auth/login` + five owner-only `/api/users` endpoints (including unlock).
 - Frontend: name dropdown + PIN in user mode, password in owner mode on `LoginPage`. New `UsersPage` with unlock button for locked accounts. Owner-gated "Users" side menu item. `useUsers` hook with `useUserNames()` (public).
 - Supersedes `task_20260408_00_signup.md` (email/password approach).
+
+### user
+
+I want some changes: the error from the internal message to be clearer, and basically the owner cannot make movements, it needs to be a user with a personal account, not a shared owner account
+
+### agent
+
+Updated the rest of this ticket to reflect those two changes.
+
+- The shared owner login is now explicitly administration-only throughout the description, constraints, auth contract, and acceptance criteria. The ticket now states that inventory movements must always come from a personal PIN-backed user account, never the shared owner account.
+- I added the explicit downstream rule and error text for movement flows: `Inventory movements require a personal user account. Sign out of the owner account and sign in with your own PIN.`
+- I also clarified the auth error wording in the contract and UI notes so the messages are specific instead of generic.
+- While touching the ticket, I cleaned up a few internal contradictions so it consistently says PINs are non-unique and only `pin_hash` is stored.
+
+This keeps the auth task aligned with personal accountability for stock movements while preserving the shared owner login for administration.
+
+### user
+
+Implement the Kanban task at /Users/ulf/Documents/GitHub/west/.agentkanban/tasks/task_20260408_01_pin_users.md using the checklist in /Users/ulf/Documents/GitHub/west/.agentkanban/tasks/todo_20260408_01_pin_users.md.
+
+### agent
+
+Implemented the remaining auth and movement-accountability work for this ticket.
+
+- Backend: tightened auth error wording, returned `423` on the fifth wrong PIN attempt, and blocked the shared owner session from all movement-writing inventory routes with the explicit personal-account error.
+- Frontend: switched `LoginPage` to the shared `useUserNames()` query, added the administration-only owner helper copy, and blocked owner sessions from the inventory workspace with the same explicit message while keeping owner-only user management intact.
+- Tests: added backend integration coverage for PIN auth and `/api/users` management plus a Playwright spec for owner user-creation, PIN login, and the owner movement block.
+- Checklist: marked the implemented slices complete; command-execution items remain for local verification where available.
 
 ### user

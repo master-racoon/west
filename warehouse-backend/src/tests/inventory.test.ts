@@ -135,15 +135,100 @@ describe("Inventory count adjust routes", () => {
     await clearDatabase();
   });
 
+  it("rejects shared owner sessions from all movement-writing routes", async () => {
+    const owner = await createAuthenticatedUser("owner");
+    const operator = await createAuthenticatedUser("user");
+    const sourceWarehouse = await createWarehouse(owner.token, "Owner Block A");
+    const destWarehouse = await createWarehouse(owner.token, "Owner Block B");
+    const item = await createItem(owner.token, "Blocked Item");
+
+    await addStock(operator.token, {
+      warehouse_id: sourceWarehouse.id,
+      barcode_or_item_id: item.id,
+      quantity: 5,
+    });
+
+    const addResponse = await makeRequest("POST", "/api/inventory/add", {
+      headers: {
+        Authorization: `Bearer ${owner.token}`,
+      },
+      body: JSON.stringify({
+        warehouse_id: sourceWarehouse.id,
+        barcode_or_item_id: item.id,
+        quantity: 1,
+      }),
+    });
+
+    const removeResponse = await makeRequest("POST", "/api/inventory/remove", {
+      headers: {
+        Authorization: `Bearer ${owner.token}`,
+      },
+      body: JSON.stringify({
+        warehouse_id: sourceWarehouse.id,
+        item_id: item.id,
+        quantity: 1,
+      }),
+    });
+
+    const transferResponse = await makeRequest(
+      "POST",
+      "/api/inventory/transfer",
+      {
+        headers: {
+          Authorization: `Bearer ${owner.token}`,
+        },
+        body: JSON.stringify({
+          item_id: item.id,
+          quantity: 1,
+          source_warehouse_id: sourceWarehouse.id,
+          dest_warehouse_id: destWarehouse.id,
+        }),
+      },
+    );
+
+    const countAdjustResponse = await makeRequest(
+      "POST",
+      "/api/inventory/count-adjust",
+      {
+        headers: {
+          Authorization: `Bearer ${owner.token}`,
+        },
+        body: JSON.stringify({
+          warehouse_id: sourceWarehouse.id,
+          item_id: item.id,
+          observed_quantity: 5,
+        }),
+      },
+    );
+
+    const expectedBody = {
+      error:
+        "Inventory movements require a personal user account. Sign out of the owner account and sign in with your own PIN.",
+    };
+
+    expect(addResponse.status).toBe(403);
+    expect(await addResponse.json()).toEqual(expectedBody);
+
+    expect(removeResponse.status).toBe(403);
+    expect(await removeResponse.json()).toEqual(expectedBody);
+
+    expect(transferResponse.status).toBe(403);
+    expect(await transferResponse.json()).toEqual(expectedBody);
+
+    expect(countAdjustResponse.status).toBe(403);
+    expect(await countAdjustResponse.json()).toEqual(expectedBody);
+  });
+
   it("creates a positive delta when observed count is above the recorded balance", async () => {
     const owner = await createAuthenticatedUser("owner");
+    const operator = await createAuthenticatedUser("user");
     const warehouse = await createWarehouse(
       owner.token,
       "Main Count Warehouse",
     );
     const item = await createItem(owner.token, "Tape Roll");
 
-    await addStock(owner.token, {
+    await addStock(operator.token, {
       warehouse_id: warehouse.id,
       barcode_or_item_id: item.id,
       quantity: 10,
@@ -151,7 +236,7 @@ describe("Inventory count adjust routes", () => {
 
     const response = await makeRequest("POST", "/api/inventory/count-adjust", {
       headers: {
-        Authorization: `Bearer ${owner.token}`,
+        Authorization: `Bearer ${operator.token}`,
       },
       body: JSON.stringify({
         warehouse_id: warehouse.id,
@@ -177,13 +262,14 @@ describe("Inventory count adjust routes", () => {
 
   it("creates a negative delta when observed count is below the recorded balance", async () => {
     const owner = await createAuthenticatedUser("owner");
+    const operator = await createAuthenticatedUser("user");
     const warehouse = await createWarehouse(
       owner.token,
       "Loss Count Warehouse",
     );
     const item = await createItem(owner.token, "Cleaning Spray");
 
-    await addStock(owner.token, {
+    await addStock(operator.token, {
       warehouse_id: warehouse.id,
       barcode_or_item_id: item.id,
       quantity: 10,
@@ -191,7 +277,7 @@ describe("Inventory count adjust routes", () => {
 
     const response = await makeRequest("POST", "/api/inventory/count-adjust", {
       headers: {
-        Authorization: `Bearer ${owner.token}`,
+        Authorization: `Bearer ${operator.token}`,
       },
       body: JSON.stringify({
         warehouse_id: warehouse.id,
@@ -215,13 +301,14 @@ describe("Inventory count adjust routes", () => {
 
   it("creates an audit movement even when the observed count matches the recorded balance", async () => {
     const owner = await createAuthenticatedUser("owner");
+    const operator = await createAuthenticatedUser("user");
     const warehouse = await createWarehouse(
       owner.token,
       "Match Count Warehouse",
     );
     const item = await createItem(owner.token, "Protein Powder");
 
-    await addStock(owner.token, {
+    await addStock(operator.token, {
       warehouse_id: warehouse.id,
       barcode_or_item_id: item.id,
       quantity: 10,
@@ -229,7 +316,7 @@ describe("Inventory count adjust routes", () => {
 
     const response = await makeRequest("POST", "/api/inventory/count-adjust", {
       headers: {
-        Authorization: `Bearer ${owner.token}`,
+        Authorization: `Bearer ${operator.token}`,
       },
       body: JSON.stringify({
         warehouse_id: warehouse.id,
@@ -255,6 +342,7 @@ describe("Inventory count adjust routes", () => {
 
   it("requires a bin when the warehouse uses bins", async () => {
     const owner = await createAuthenticatedUser("owner");
+    const operator = await createAuthenticatedUser("user");
     const warehouse = await createWarehouse(
       owner.token,
       "Bin Count Warehouse",
@@ -263,7 +351,7 @@ describe("Inventory count adjust routes", () => {
     const item = await createItem(owner.token, "Packing Tape");
     const bin = await createBin(owner.token, warehouse.id, "A-01");
 
-    await addStock(owner.token, {
+    await addStock(operator.token, {
       warehouse_id: warehouse.id,
       barcode_or_item_id: item.id,
       quantity: 3,
@@ -272,7 +360,7 @@ describe("Inventory count adjust routes", () => {
 
     const response = await makeRequest("POST", "/api/inventory/count-adjust", {
       headers: {
-        Authorization: `Bearer ${owner.token}`,
+        Authorization: `Bearer ${operator.token}`,
       },
       body: JSON.stringify({
         warehouse_id: warehouse.id,

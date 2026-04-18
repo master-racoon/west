@@ -37,6 +37,24 @@ function DashboardIndexRedirect() {
 }
 
 function InventoryPage() {
+  const { user } = useAuthStore();
+
+  if (user?.role === "owner") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-3xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-950 shadow-sm">
+            <h1 className="text-2xl font-bold">Inventory</h1>
+            <p className="mt-3 text-sm leading-6">
+              Inventory movements require a personal user account. Sign out of
+              the owner account and sign in with your own PIN.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto py-6 sm:px-6 lg:px-8 space-y-8">

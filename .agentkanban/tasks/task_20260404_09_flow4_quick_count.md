@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-5.1 Quick Count and Reconcile Inventory"
-lane: todo
+lane: doing
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-16T00:00:00Z
 description: "User counts physical items and adjusts inventory to match observation"

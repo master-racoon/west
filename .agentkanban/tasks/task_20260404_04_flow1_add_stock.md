@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-2.1 Scan and Add Stock to Warehouse"
-lane: todo
+lane: doing
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-04T00:00:00Z
 description: "User scans barcode, enters quantity, and adds stock to warehouse"
@@ -181,3 +181,4 @@ export function useInventoryBalance(filters?: InventoryFilter) {
 ## Conversation
 
 ### user
+Good job on the first part, but you are still missing the scanning functionality

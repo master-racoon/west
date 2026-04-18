@@ -1,6 +1,6 @@
 ---
 title: "[DEV] US-3.1 Scan and Remove Stock from Warehouse"
-lane: todo
+lane: doing
 created: 2026-04-04T00:00:00Z
 updated: 2026-04-16T00:00:00Z
 description: "User removes quantity from warehouse with owner override for negative stock"

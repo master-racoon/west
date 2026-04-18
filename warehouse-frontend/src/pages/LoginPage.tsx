@@ -1,11 +1,10 @@
-import { useState, useEffect, KeyboardEvent } from "react";
+import { useState, KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUserNames } from "../hooks/queries/useUsers";
 import { useAuthStore } from "../stores/authStore";
 
-interface UserName {
-  id: string;
-  name: string;
-}
+const OWNER_ADMIN_ONLY_MESSAGE =
+  "The shared owner login is for administration only. Inventory movements require a personal user account signed in with your own PIN.";
 
 export function LoginPage() {
   const [mode, setMode] = useState<"user" | "owner">("user");
@@ -14,29 +13,11 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [userNames, setUserNames] = useState<UserName[]>([]);
-  const [namesLoading, setNamesLoading] = useState(false);
   const navigate = useNavigate();
   const { setUser, setToken } = useAuthStore();
-
-  // Fetch user names when mount or switch to user mode
-  const fetchUserNames = async () => {
-    setNamesLoading(true);
-    try {
-      const res = await fetch("/api/users/names");
-      if (res.ok) {
-        const data = await res.json();
-        setUserNames(data);
-      }
-    } finally {
-      setNamesLoading(false);
-    }
-  };
-
-  // Fetch user names on mount (user mode is default)
-  useEffect(() => {
-    fetchUserNames();
-  }, []);
+  const userNamesQuery = useUserNames();
+  const userNames = userNamesQuery.data ?? [];
+  const namesLoading = userNamesQuery.isLoading || userNamesQuery.isFetching;
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -64,24 +45,37 @@ export function LoginPage() {
         body: JSON.stringify(body),
       });
 
+      const responseBody = await response.json().catch(() => null);
+      const responseError =
+        responseBody &&
+        typeof responseBody === "object" &&
+        "error" in responseBody &&
+        typeof responseBody.error === "string"
+          ? responseBody.error
+          : null;
+
       if (response.status === 423) {
-        setError("Account locked. Try again later.");
+        setError(
+          responseError ||
+            "Account locked. Ask an owner to unlock it or try again in 15 minutes.",
+        );
         return;
       }
       if (response.status === 401) {
         setError(
-          mode === "owner"
-            ? "Invalid password. Try again."
-            : "Invalid PIN. Try again.",
+          responseError ||
+            (mode === "owner"
+              ? "Invalid password. Try again."
+              : "Invalid PIN. Try again."),
         );
         return;
       }
       if (!response.ok) {
-        setError("Login failed. Please try again.");
+        setError(responseError || "Login failed. Please try again.");
         return;
       }
 
-      const data = await response.json();
+      const data = responseBody;
       setToken(data.session_token);
       setUser(data.user);
       localStorage.setItem("session_token", data.session_token);
@@ -98,11 +92,7 @@ export function LoginPage() {
   };
 
   const toggleMode = () => {
-    setMode((m) => {
-      const next = m === "user" ? "owner" : "user";
-      if (next === "user") fetchUserNames();
-      return next;
-    });
+    setMode((m) => (m === "user" ? "owner" : "user"));
     setError(null);
     setPin("");
     setPassword("");
@@ -124,6 +114,9 @@ export function LoginPage() {
 
       {mode === "user" ? (
         <>
+          {userNamesQuery.isError && (
+            <div style={{ color: "red" }}>Failed to load user list.</div>
+          )}
           <select
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
@@ -152,15 +145,20 @@ export function LoginPage() {
           />
         </>
       ) : (
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isLoading}
-          style={{ padding: "8px", width: "240px" }}
-        />
+        <>
+          <div style={{ width: "240px", color: "#555", fontSize: "14px" }}>
+            {OWNER_ADMIN_ONLY_MESSAGE}
+          </div>
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+            style={{ padding: "8px", width: "240px" }}
+          />
+        </>
       )}
 
       {error && <div style={{ color: "red" }}>{error}</div>}
