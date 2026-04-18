@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "wrangler pages dev",
     "build": "npm run type-check && npm run openapi:export",
-    "deploy": "wrangler pages deploy",
+    "deploy": "wrangler pages deploy --commit-dirty=true",
     "logs": "wrangler pages deployment tail --project-name=warehouse-backend",
     "openapi:export": "tsx src/scripts/export-openapi.ts",
     "db:generate": "drizzle-kit generate",
@@ -24,7 +24,6 @@
     "@hono/zod-openapi": "^1.1.5",
     "@neondatabase/serverless": "^0.9.5",
     "bcryptjs": "^3.0.3",
-    "better-auth": "1.3.9",
     "drizzle-orm": "^0.33.0",
     "hono": "^4.6.3",
     "zod": "^4.1.13"
@@ -33,13 +32,13 @@
     "@cloudflare/workers-types": "^4.20241127.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.9.0",
+    "@typescript/native-preview": "latest",
     "dotenv": "^17.4.1",
     "drizzle-kit": "^0.24.0",
     "oxfmt": "latest",
     "oxlint": "latest",
     "tsx": "^4.21.0",
     "typescript": "^5.6.3",
-    "@typescript/native-preview": "latest",
     "vitest": "^1.6.1",
     "wrangler": "^3.114.17"
   },

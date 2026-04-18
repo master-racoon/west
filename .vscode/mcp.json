@@ -1,0 +1,19 @@
+{
+  "servers": {
+    "neon": {
+      "command": "npx",
+      "args": ["-y", "@neondatabase/mcp-server-neon", "start"],
+      "env": {
+        "NEON_API_KEY": "${input:neonApiKey}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "neonApiKey",
+      "type": "promptString",
+      "description": "Neon API Key (from https://console.neon.tech/app/settings/api-keys)",
+      "password": true
+    }
+  ]
+}

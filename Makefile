@@ -1,4 +1,4 @@
-.PHONY: help install i setup sync db-generate db-migrate generate-api check type-check type-check-backend type-check-frontend build build-backend build-frontend dev stop clean backend frontend docker logs deploy deploy-backend deploy-scheduler deploy-frontend test test-backend test-e2e test-all context-check
+.PHONY: help install i setup sync db-generate db-migrate generate-api check type-check type-check-backend type-check-frontend build build-backend build-frontend dev stop clean backend frontend docker logs deploy deploy-backend deploy-scheduler deploy-frontend rotate test test-backend test-e2e test-all context-check
 
 BACKEND_DIR := warehouse-backend
 FRONTEND_DIR := warehouse-frontend
@@ -31,6 +31,7 @@ help:
 	@echo "  make deploy-backend   - Deploy backend API only"
 	@echo "  make deploy-scheduler - Deploy scheduler Worker only"
 	@echo "  make deploy-frontend  - Deploy frontend only"
+	@echo "  make rotate      - Rotate production secrets (prompts per variable, Enter to skip)"
 
 
 # Install all services
@@ -191,3 +192,22 @@ test-e2e:
 # Validate AI context files against actual codebase
 context-check:
 	@./context-check.sh
+
+# Rotate production secrets — prompts for each, Enter to skip
+rotate:
+	@echo "Rotating warehouse-backend production secrets"
+	@echo "Press Enter to skip a variable, or type a new value and press Enter to update."
+	@echo ""
+	@cd $(BACKEND_DIR) && \
+	for var in BETTER_AUTH_URL FRONTEND_URL APP_PASSWORD DATABASE_URL; do \
+		printf "  $$var (Enter to skip): "; \
+		read val < /dev/tty; \
+		if [ -n "$$val" ]; then \
+			echo "$$val" | npx wrangler pages secret put $$var --project-name warehouse-backend; \
+			echo "  ✅ $$var updated"; \
+		else \
+			echo "  ↷  Skipped $$var"; \
+		fi; \
+	done
+	@echo ""
+	@echo "✅ Secret rotation complete!"

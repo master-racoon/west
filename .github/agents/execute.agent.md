@@ -1,7 +1,7 @@
 ---
 name: execute
 description: Runs all tasks for a user story sequentially in the order they appear in agentkanban.
-agents: [build, qa, healer]
+agents: [build, qa, healer, ux, playwright]
 argument-hint: "The user story ID or name to execute tasks for."
 tools: ["vscode", "read", "agent", "search", "web", "todo"]
 ---

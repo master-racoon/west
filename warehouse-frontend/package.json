@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "deploy": "vite build && npx wrangler pages deploy dist --branch=main",
+    "deploy": "vite build && wrangler pages deploy --commit-dirty=true",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsgo --noEmit --incremental",

@@ -13,7 +13,6 @@ import inventoryRoutes from "./routes/inventory";
 
 interface Bindings {
   DATABASE_URL?: string;
-  BETTER_AUTH_SECRET?: string;
   APP_PASSWORD?: string;
   FRONTEND_URL?: string;
 }

@@ -1,0 +1,7 @@
+name = "warehouse-frontend"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+# VITE_ vars are build-time; set them in .env.production or Cloudflare Pages dashboard
+# Runtime vars for any future Cloudflare Pages Functions (none currently)
+[vars]

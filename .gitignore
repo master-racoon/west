@@ -146,5 +146,6 @@ warehouse-frontend/test-results/
 # Local AI tooling
 .claude/
 .playwright/
+.playwright-cli/
 
 .DS_STORE

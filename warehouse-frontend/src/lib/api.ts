@@ -47,7 +47,7 @@ async function getAuthHeaders() {
 }
 
 const apiClient = new WarehouseClient({
-  BASE: "",
+  BASE: import.meta.env.VITE_API_URL ?? "",
   WITH_CREDENTIALS: true,
   CREDENTIALS: "include",
   HEADERS: getAuthHeaders,
