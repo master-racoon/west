@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-6 Inventory Visibility (Search, History, Location)"
-lane: doing
+lane: done
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-18T11:20:09.263Z
+updated: 2026-04-18T14:56:47.323Z
 description: Users view inventory levels, movement history, and item locations
 labels:
   - inventory-visibility
-sortOrder: 1
+sortOrder: -2
 slug: read_inventory_visibility
 ---
 
