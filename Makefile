@@ -1,4 +1,4 @@
-.PHONY: help install i setup sync db-generate db-migrate generate-api check type-check type-check-backend type-check-frontend build build-backend build-frontend dev stop clean backend frontend docker logs deploy deploy-backend deploy-scheduler deploy-frontend rotate test test-backend test-e2e test-all context-check
+.PHONY: help install i setup sync db-generate db-migrate generate-api check type-check type-check-backend type-check-frontend build build-backend build-frontend dev stop clean backend frontend docker logs deploy deploy-backend deploy-frontend rotate test test-backend test-e2e test-all context-check
 
 BACKEND_DIR := warehouse-backend
 FRONTEND_DIR := warehouse-frontend
@@ -27,9 +27,8 @@ help:
 	@echo "  make test-backend     - Run the canonical backend test flow (Docker DB + migrations + Vitest)"
 	@echo "  make test-e2e         - Run E2E tests"
 	@echo "  make context-check    - Validate AI context files against actual codebase"
-	@echo "  make deploy     - Deploy all services (backend, scheduler, frontend)"
+	@echo "  make deploy     - Deploy all services (backend, frontend)"
 	@echo "  make deploy-backend   - Deploy backend API only"
-	@echo "  make deploy-scheduler - Deploy scheduler Worker only"
 	@echo "  make deploy-frontend  - Deploy frontend only"
 	@echo "  make rotate      - Rotate production secrets (prompts per variable, Enter to skip)"
 
@@ -145,7 +144,7 @@ logs:
 	@cd $(BACKEND_DIR) && $(DOCKER_COMPOSE) logs --tail=50
 
 # Deploy all services to production
-deploy: deploy-backend deploy-scheduler deploy-frontend
+deploy: deploy-backend deploy-frontend
 	@echo "🚀 All services deployed successfully!"
 
 # Deploy backend API to Cloudflare Pages
@@ -153,12 +152,6 @@ deploy-backend:
 	@echo "📦 Deploying backend API to Cloudflare Pages..."
 	@cd $(BACKEND_DIR) && npm run deploy
 	@echo "✅ Backend API deployed!"
-
-# Deploy scheduler Worker to Cloudflare
-deploy-scheduler:
-	@echo "⏰ Deploying scheduler Worker to Cloudflare..."
-	@cd $(BACKEND_DIR) && npm run scheduler:deploy
-	@echo "✅ Scheduler Worker deployed!"
 
 # Deploy frontend to Cloudflare Pages
 deploy-frontend:
