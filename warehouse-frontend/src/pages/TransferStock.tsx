@@ -6,6 +6,7 @@ import {
 } from "../hooks/queries/useInventory";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
 import { ApiError, client, getApiErrorMessage } from "../lib/api";
+import { ScanOverlay } from "../components/ScanOverlay";
 
 interface ResolvedItem {
   id: string;
@@ -31,6 +32,7 @@ export function TransferStockPage({
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isResolvingItem, setIsResolvingItem] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const warehousesQuery = useWarehouses();
   const transferStockMutation = useTransferStock();
@@ -81,6 +83,35 @@ export function TransferStockPage({
     setBarcodeError(null);
     setFormError(null);
     setSuccessMessage(null);
+  };
+
+  const handleScanResult = (value: string) => {
+    setBarcodeOrItemId(value);
+    setResolvedItem(null);
+    resetMessages();
+    setShowScanner(false);
+    setTimeout(async () => {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      setIsResolvingItem(true);
+      try {
+        const barcodeResult = await client.barcodes.lookupItemByBarcode(trimmed);
+        setResolvedItem({ id: barcodeResult.item_id, name: barcodeResult.item_name });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          try {
+            const itemResult = await client.items.getItem(trimmed);
+            setResolvedItem({ id: itemResult.id, name: itemResult.name });
+          } catch {
+            setBarcodeError("Item not found");
+          }
+        } else {
+          setBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
+        }
+      } finally {
+        setIsResolvingItem(false);
+      }
+    }, 0);
   };
 
   const resetForm = () => {
@@ -331,6 +362,14 @@ export function TransferStockPage({
               </div>
               <button
                 type="button"
+                onClick={() => setShowScanner(true)}
+                className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={transferStockMutation.isPending}
+              >
+                📷 Scan
+              </button>
+              <button
+                type="button"
                 onClick={() => void resolveItem()}
                 className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={transferStockMutation.isPending || isResolvingItem}
@@ -542,6 +581,14 @@ export function TransferStockPage({
           </form>
         </section>
       </div>
+      {showScanner && (
+        <ScanOverlay
+          enableOcr
+          onBarcodeScan={handleScanResult}
+          onTextCapture={handleScanResult}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   );
 }
