@@ -149,6 +149,12 @@ export const client = {
       ),
     searchItems: (q: string) =>
       withAuthHandling(apiClient.items.searchItems({ q })),
+    getItemBalance: (itemId: string) =>
+      withAuthHandling(apiClient.items.getItemBalance({ id: itemId })),
+    getItemMovements: (itemId: string, limit?: number, offset?: number) =>
+      withAuthHandling(
+        apiClient.items.getItemMovements({ id: itemId, limit, offset }),
+      ),
   },
   barcodes: {
     lookupItemByBarcode: (barcode: string) =>

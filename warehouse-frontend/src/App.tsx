@@ -15,11 +15,9 @@ import { AddStockPage } from "./pages/AddStock";
 import { RemoveStockPage } from "./pages/RemoveStock";
 import { TransferStockPage } from "./pages/TransferStock";
 import { QuickCountPage } from "./pages/QuickCount";
+import { InventorySearchPage } from "./pages/InventorySearch";
+import { ItemDetailPage } from "./pages/ItemDetail";
 import { useAuthStore } from "./stores/authStore";
-
-function ComingSoon({ label }: { label: string }) {
-  return <div>{label} — Coming Soon</div>;
-}
 
 function DashboardIndexRedirect() {
   const { user } = useAuthStore();
@@ -163,7 +161,11 @@ export function App() {
             <Route path="inventory/*" element={<InventoryPage />} />
             <Route
               path="inventory-visibility"
-              element={<ComingSoon label="Inventory Visibility" />}
+              element={<InventorySearchPage />}
+            />
+            <Route
+              path="inventory-visibility/:id"
+              element={<ItemDetailPage />}
             />
           </Route>
         </Route>

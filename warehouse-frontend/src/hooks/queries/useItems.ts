@@ -69,3 +69,66 @@ export function useAddBarcode() {
     },
   });
 }
+
+export interface ItemBalance {
+  item_id: string;
+  item_name: string;
+  warehouses: Array<{
+    warehouse_id: string;
+    warehouse_name: string;
+    total_quantity: number;
+    bins: Array<{
+      bin_id: string;
+      bin_name: string;
+      quantity: number;
+    }>;
+  }>;
+}
+
+export interface ItemMovement {
+  movement_id: string;
+  type:
+    | "ADD"
+    | "REMOVE"
+    | "TRANSFER"
+    | "COUNT_ADJUSTMENT"
+    | "MANUAL_ADJUSTMENT";
+  timestamp: string;
+  user_id: string;
+  user_name: string;
+  quantity: number;
+  source_warehouse_id?: string;
+  source_warehouse_name?: string;
+  dest_warehouse_id?: string;
+  dest_warehouse_name?: string;
+  source_bin_id?: string;
+  source_bin_name?: string;
+  dest_bin_id?: string;
+  dest_bin_name?: string;
+  note?: string;
+}
+
+export interface ItemMovementsResponse {
+  total: number;
+  movements: ItemMovement[];
+}
+
+export function useItemBalance(itemId: string | null) {
+  return useQuery({
+    queryKey: ["items", itemId, "balance"],
+    queryFn: () => client.items.getItemBalance(itemId!),
+    enabled: !!itemId,
+  });
+}
+
+export function useItemMovements(
+  itemId: string | null,
+  limit: number = 100,
+  offset: number = 0,
+) {
+  return useQuery({
+    queryKey: ["items", itemId, "movements", limit, offset],
+    queryFn: () => client.items.getItemMovements(itemId!, limit, offset),
+    enabled: !!itemId,
+  });
+}

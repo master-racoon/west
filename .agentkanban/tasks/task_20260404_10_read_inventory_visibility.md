@@ -1,11 +1,13 @@
 ---
 title: "[DEV] US-6 Inventory Visibility (Search, History, Location)"
-lane: todo
+lane: doing
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-04T00:00:00Z
-description: "Users view inventory levels, movement history, and item locations"
+updated: 2026-04-18T11:20:09.263Z
+description: Users view inventory levels, movement history, and item locations
 labels:
   - inventory-visibility
+sortOrder: 1
+slug: read_inventory_visibility
 ---
 
 ## DFD Reference
@@ -188,5 +190,30 @@ export function useSearchItems(query: string) {
 - Some endpoints (search, balance, movements) are high-frequency reads — validate query performance
 
 ## Conversation
+
+### user
+
+implement
+
+### agent
+
+Implemented US-6 Inventory Visibility end-to-end.
+
+**Backend** (`warehouse-backend/src/routes/items.ts`):
+
+- Enhanced `GET /search?q=` — now searches by name (substring), barcode (exact + prefix), and UUID; returns `barcodes[]` and `total_quantity`
+- Added `GET /:id/balance` — hierarchical balance per warehouse/bin; 404 on missing item; only shows bins when `warehouse.use_bins=true`
+- Added `GET /:id/movements?limit=&offset=` — paginated movement history with joins to users, warehouses, bins; returns `{ total, movements[] }`
+
+**Frontend**:
+
+- `src/generated-api/services/ItemsService.ts` — added `getItemBalance` and `getItemMovements` methods
+- `src/lib/api.ts` — added `client.items.getItemBalance` and `client.items.getItemMovements`
+- `src/hooks/queries/useItems.ts` — added `useItemBalance`, `useItemMovements` hooks + interfaces
+- `src/pages/InventorySearch.tsx` — new page with debounced search, spinner, error/empty/results states, click-to-navigate
+- `src/pages/ItemDetail.tsx` — new page with Availability tab (warehouse/bin hierarchy) and Movements tab (table + pagination); error states on all fetches
+- `src/App.tsx` — replaced `ComingSoon` route with `InventorySearchPage` at `/dashboard/inventory-visibility` and `ItemDetailPage` at `/dashboard/inventory-visibility/:id`
+
+SideMenu already had the "Inventory Visibility" nav link pointing to `/dashboard/inventory-visibility`. No schema migrations needed (uses existing tables).
 
 ### user
