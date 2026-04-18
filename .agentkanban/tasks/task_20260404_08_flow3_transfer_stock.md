@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-4.1 Transfer Stock Between Warehouses"
-lane: todo
+lane: done
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-18T08:04:02.680Z
+updated: 2026-04-18T10:53:35.861Z
 description: User transfers quantity of item between warehouses with optional bin selection
 labels:
   - flow-3-transfer-stock
-sortOrder: 9
+sortOrder: 10
 slug: flow3_transfer_stock
 ---
 
