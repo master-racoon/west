@@ -3,7 +3,9 @@ import { expect, test } from "@playwright/test";
 async function loginAsOwner(page: Parameters<typeof test>[0]["page"]) {
   await page.goto("/login");
   await page.getByRole("button", { name: "Login as owner" }).click();
-  await page.getByPlaceholder("Password").fill(process.env["PLAYWRIGHT_OWNER_PASSWORD"] ?? "warehouse1");
+  await page
+    .getByPlaceholder("Password")
+    .fill(process.env["PLAYWRIGHT_OWNER_PASSWORD"] ?? "warehouse1");
   await page.getByRole("button", { name: "Login" }).click();
 }
 
@@ -13,17 +15,25 @@ async function logout(page: Parameters<typeof test>[0]["page"]) {
   });
   await page.getByRole("button", { name: /owner|user/ }).click();
   await page.getByRole("button", { name: "Logout" }).click();
-  await expect(page.getByRole("heading", { name: "Warehouse Login" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Warehouse Login" }),
+  ).toBeVisible();
 }
 
 test.describe("Auth flow", () => {
-  test("owner can login with valid password and see dashboard", async ({ page }) => {
+  test("owner can login with valid password and see dashboard", async ({
+    page,
+  }) => {
     await page.goto("/login");
     await page.getByRole("button", { name: "Login as owner" }).click();
-    await page.getByPlaceholder("Password").fill(process.env["PLAYWRIGHT_OWNER_PASSWORD"] ?? "warehouse1");
+    await page
+      .getByPlaceholder("Password")
+      .fill(process.env["PLAYWRIGHT_OWNER_PASSWORD"] ?? "warehouse1");
     await page.getByRole("button", { name: "Login" }).click();
     await expect(page.getByRole("button", { name: "owner" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Configuration" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Configuration" }),
+    ).toBeVisible();
   });
 
   test("invalid owner password shows error", async ({ page }) => {
@@ -32,12 +42,16 @@ test.describe("Auth flow", () => {
     await page.getByPlaceholder("Password").fill("wrongpassword");
     await page.getByRole("button", { name: "Login" }).click();
     await expect(page.getByText(/Incorrect/)).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Warehouse Login" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Warehouse Login" }),
+    ).toBeVisible();
   });
 
   test("unauthenticated user is redirected to login", async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { name: "Warehouse Login" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Warehouse Login" }),
+    ).toBeVisible();
   });
 
   test("session persists after page reload", async ({ page }) => {
@@ -51,6 +65,8 @@ test.describe("Auth flow", () => {
     await loginAsOwner(page);
     await logout(page);
     await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { name: "Warehouse Login" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Warehouse Login" }),
+    ).toBeVisible();
   });
 });

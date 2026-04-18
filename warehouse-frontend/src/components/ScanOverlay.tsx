@@ -628,6 +628,6 @@ export function ScanOverlay({
         </div>
       )}
     </div>,
-    document.body
+    document.body,
   );
 }
