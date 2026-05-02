@@ -19,6 +19,8 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 
 function handleUnauthorized(error: unknown): never {
   if (error instanceof ApiError && error.status === 401) {
+    // On 401, verify the session is actually expired before clearing auth
+    // This prevents clearing on transient failures
     localStorage.removeItem("session_token");
     useAuthStore.getState().clearUser();
     window.location.replace("/login");
@@ -31,7 +33,35 @@ async function withAuthHandling<T>(request: Promise<T>): Promise<T> {
   try {
     return await request;
   } catch (error) {
-    handleUnauthorized(error);
+    // On 401, first validate that session is actually expired
+    if (error instanceof ApiError && error.status === 401) {
+      try {
+        const token = localStorage.getItem("session_token");
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL ?? ""}/api/auth/session`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          },
+        );
+
+        // If session endpoint also returns 401, user is definitely unauthenticated
+        if (!response.ok) {
+          handleUnauthorized(error);
+        }
+        // If session endpoint returns 2xx, session is still valid
+        // So the 401 was likely a transient error - rethrow to let React Query retry
+        throw error;
+      } catch (sessionError) {
+        // If we can't verify the session, assume it's expired
+        if (sessionError instanceof ApiError && sessionError.status === 401) {
+          handleUnauthorized(error);
+        }
+        // For other errors (network), just rethrow the original 401
+        throw error;
+      }
+    }
+
+    throw error;
   }
 }
 

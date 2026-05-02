@@ -143,6 +143,15 @@ export const users = pgTable("users", {
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const session = pgTable("session", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  token: uuid("token").notNull().unique(),
+  user_id: uuid("user_id"), // NULL for owner sessions
+  role: varchar("role", { length: 10 }).notNull(),
+  name: varchar("name", { length: 200 }),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const removalApproval = pgTable(
   "removal_approval",
   {

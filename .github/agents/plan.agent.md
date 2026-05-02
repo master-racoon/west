@@ -1,7 +1,6 @@
 ---
 name: plan
 description: Decomposes Epics and User Stories into technically-sound, vertical-slice Kanban tasks.
-agents: ["execute"]
 argument-hint: "A high-level feature or user story to break down."
 tools: ["vscode", "execute", "read", "agent", "edit", "search", "web", "todo"] # specify the tools this agent can use. If not set, all enabled tools are allowed.
 ---
@@ -30,6 +29,20 @@ When the user asks to "go over backlog tasks" or "extend acceptance criteria":
 4. Keep edits lightweight and implementation-agnostic (no unnecessary low-level specs)
 5. Do not modify `docs/dfd_level0.md` during this enrichment pass
 6. Return a short coverage summary: tasks updated + key gaps closed
+
+# Input Sources
+
+## JTBD Changelog (primary trigger)
+
+Before doing anything else, check `docs/jtbd/CHANGELOG.md` for entries where `Ready for planning: yes`.
+
+For each ready entry:
+1. Read `docs/jtbd/<slug>/user-stories.md` for the full story set to plan
+2. Read `docs/jtbd/<slug>/dfd.md` for the flow scope (use instead of deriving flows from scratch)
+3. Read `docs/jtbd/<slug>/solution.md` for out-of-scope constraints and dependencies
+4. Proceed to Phase 0 with those stories
+
+If no changelog entry is ready and the user provides a story directly, proceed as normal.
 
 # Start: DFD-First, Phase-by-Phase
 

@@ -32,6 +32,7 @@ Follow the patterns in existing specs (`auth.spec.ts`, `warehouse-create.spec.ts
 3. Run the spec with `--project=chromium` first to get fast feedback.
 4. Fix selector failures by iterating on ARIA queries — read existing source only to discover element roles, labels, or text.
 5. Once chromium passes, run the full suite.
+6. make use of the Make file in root
 
 ## Constraints
 

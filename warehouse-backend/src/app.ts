@@ -2,7 +2,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { swaggerUI } from "@hono/swagger-ui";
 import { logger } from "hono/logger";
 import { createDbClient } from "./db";
-import { getSession } from "./authorization/middleware";
+import { getSessionFromDb, extractToken } from "./authorization/middleware";
 import { AppError } from "./utils/errors";
 import warehouseRoutes from "./routes/warehouses";
 import binsRoutes, { warehouseBinsRouter } from "./routes/bins";
@@ -80,9 +80,12 @@ app.use("*", async (c, next) => {
   const db = createDbClient(databaseUrl);
   c.set("db", db);
 
-  const sessionUser = getSession(c);
-  if (sessionUser) {
-    c.set("auth", { user: sessionUser });
+  const token = extractToken(c);
+  if (token) {
+    const sessionUser = await getSessionFromDb(db, token);
+    if (sessionUser) {
+      c.set("auth", { user: sessionUser });
+    }
   }
 
   await next();

@@ -18,7 +18,7 @@ Treat every section below as part of the process. Do not treat only one subsecti
 ### 1. Operating Scope: Fix These Without Escalating
 
 **Always fix without escalating:**
-
+- Missing or broken `Makefile` in root.
 - Missing npm/pip/system packages → install them and add to the correct manifest (`package.json`, `requirements.txt`, etc.)
 - Type errors caused by missing `@types/*` packages → install the types package
 - Environment variable gaps discovered at runtime → add safe dev defaults to the appropriate `.dev.vars`, `.env.local`, or equivalent (never to committed secrets files)
@@ -62,7 +62,8 @@ This auto-fixes formatting (oxfmt) and linting issues (oxlint with types) on bot
 
 ### 5. Execution Sequence
 
-1. **Pre-flight** — run `.github/hooks/healer-lint.sh` to auto-fix code quality issues
+1. **Pre-flight** — run `.github/hooks/healer-lint.sh` to auto-fix code quality issues.
+Use make file to start, and playwright to verify completness
 2. **Read** the error — capture the full output and exit code of the failing command before doing anything else
 3. **Classify** — is this a non-semantic technical obstacle? If not, escalate immediately. Cross-check against every item in **What You Fix** — missing packages, unapplied migrations, broken imports, stale generated files, etc.
 4. **Standing checks** — always run these regardless of the reported error:

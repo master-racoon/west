@@ -1290,6 +1290,150 @@
       }
     },
     "/api/bins/{id}": {
+      "patch": {
+        "tags": [
+          "Bins"
+        ],
+        "operationId": "updateBin",
+        "summary": "Rename a bin",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bin updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "warehouse_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "warehouse_id",
+                    "name",
+                    "created_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bin not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Bin name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "Bins"
@@ -1675,7 +1819,7 @@
           "Items"
         ],
         "operationId": "searchItems",
-        "summary": "Search items by name or description",
+        "summary": "Search items by name, barcode, or ID",
         "parameters": [
           {
             "schema": {
@@ -1707,11 +1851,22 @@
                       },
                       "description": {
                         "type": "string"
+                      },
+                      "barcodes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "total_quantity": {
+                        "type": "integer"
                       }
                     },
                     "required": [
                       "id",
-                      "name"
+                      "name",
+                      "barcodes",
+                      "total_quantity"
                     ]
                   }
                 }
@@ -1959,6 +2114,311 @@
           },
           "409": {
             "description": "Barcode already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{id}/balance": {
+      "get": {
+        "tags": [
+          "Items"
+        ],
+        "operationId": "getItemBalance",
+        "summary": "Get item inventory balance across warehouses",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "item_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "item_name": {
+                      "type": "string"
+                    },
+                    "warehouses": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "warehouse_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "warehouse_name": {
+                            "type": "string"
+                          },
+                          "total_quantity": {
+                            "type": "integer"
+                          },
+                          "bins": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "bin_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "bin_name": {
+                                  "type": "string"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "bin_id",
+                                "bin_name",
+                                "quantity"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "warehouse_id",
+                          "warehouse_name",
+                          "total_quantity",
+                          "bins"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "item_id",
+                    "item_name",
+                    "warehouses"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{id}/movements": {
+      "get": {
+        "tags": [
+          "Items"
+        ],
+        "operationId": "getItemMovements",
+        "summary": "Get movement history for an item",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item movements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "movements": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "movement_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "ADD",
+                              "REMOVE",
+                              "TRANSFER",
+                              "COUNT_ADJUSTMENT",
+                              "MANUAL_ADJUSTMENT"
+                            ]
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "user_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "user_name": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          },
+                          "source_warehouse_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "source_warehouse_name": {
+                            "type": "string"
+                          },
+                          "dest_warehouse_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "dest_warehouse_name": {
+                            "type": "string"
+                          },
+                          "source_bin_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "source_bin_name": {
+                            "type": "string"
+                          },
+                          "dest_bin_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "dest_bin_name": {
+                            "type": "string"
+                          },
+                          "note": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "movement_id",
+                          "type",
+                          "timestamp",
+                          "user_id",
+                          "user_name",
+                          "quantity"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "movements"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found",
             "content": {
               "application/json": {
                 "schema": {

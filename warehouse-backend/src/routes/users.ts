@@ -2,7 +2,7 @@ import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { hash } from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { users } from "../db/schema";
-import { getSession } from "../authorization/middleware";
+import { requireRole } from "../authorization/middleware";
 import {
   ForbiddenError,
   NotFoundError,
@@ -62,16 +62,6 @@ const SuccessResponse = z.object({
 });
 
 // Helper: require owner session or return 403
-function requireOwnerSession(c: any) {
-  const session = getSession(c);
-  if (!session) {
-    throw new UnauthorizedError("Unauthorized");
-  }
-  if (session.role !== "owner") {
-    throw new ForbiddenError("Forbidden");
-  }
-  return session;
-}
 
 const getUserNamesRoute = createRoute({
   method: "get",
@@ -343,7 +333,7 @@ router.openapi(getUserNamesRoute, async (c) => {
 // All routes below require owner auth
 // POST /api/users
 router.openapi(createUserRoute, async (c) => {
-  requireOwnerSession(c);
+  requireRole(c, "owner");
 
   const payload = c.req.valid("json");
 
@@ -364,7 +354,7 @@ router.openapi(createUserRoute, async (c) => {
 
 // GET /api/users
 router.openapi(getUsersRoute, async (c) => {
-  requireOwnerSession(c);
+  requireRole(c, "owner");
 
   const db = c.get("db");
   const result = await db

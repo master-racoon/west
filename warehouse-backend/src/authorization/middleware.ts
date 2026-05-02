@@ -1,4 +1,6 @@
 import { Context } from "hono";
+import { eq } from "drizzle-orm";
+import { session } from "../db/schema";
 import { ForbiddenError, UnauthorizedError } from "../utils/errors";
 
 export interface AuthUser {
@@ -13,16 +15,30 @@ export type SessionUser = {
   name?: string;
 };
 
-// In-memory session store (lives within a single Cloudflare Worker isolate)
-export const sessions = new Map<string, SessionUser>();
-
-export function getSession(c: Context): SessionUser | null {
+export function extractToken(c: Context): string | null {
   const authHeader = c.req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return null;
   }
-  const token = authHeader.slice(7);
-  return sessions.get(token) ?? null;
+  return authHeader.slice(7);
+}
+
+export async function getSessionFromDb(
+  db: any,
+  token: string,
+): Promise<SessionUser | null> {
+  const rows = await db
+    .select()
+    .from(session)
+    .where(eq(session.token, token))
+    .limit(1);
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  return {
+    id: row.user_id ?? "owner-user",
+    role: row.role as "owner" | "user",
+    ...(row.name ? { name: row.name } : {}),
+  };
 }
 
 export function getAuth(c: Context): AuthUser | null {

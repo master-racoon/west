@@ -23,7 +23,7 @@ export function useAuth() {
   const { user, setUser, clearUser } = useAuthStore();
   const navigate = useNavigate();
 
-  const { isLoading } = useQuery({
+  const { isLoading, refetch } = useQuery({
     queryKey: ["auth", "session"],
     queryFn: async () => {
       const data = await fetchSession();
@@ -34,7 +34,8 @@ export function useAuth() {
       }
       return data;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 1 * 60 * 1000, // Reduced from 5 min to 1 min for production resilience
+    refetchInterval: 2 * 60 * 1000, // Background refetch every 2 minutes
   });
 
   const logout = async () => {
@@ -53,5 +54,6 @@ export function useAuth() {
     isLoading,
     isAuthenticated: user !== null,
     logout,
+    refetchSession: refetch, // Expose for manual validation
   };
 }

@@ -1,8 +1,8 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq } from "drizzle-orm";
 import { compare } from "bcryptjs";
-import { sessions, type SessionUser } from "../authorization/middleware";
-import { users } from "../db/schema";
+import { type SessionUser } from "../authorization/middleware";
+import { users, session } from "../db/schema";
 
 const router = new OpenAPIHono<{
   Bindings: { APP_PASSWORD?: string; DATABASE_URL?: string };
@@ -164,7 +164,8 @@ router.openapi(loginRoute, async (c) => {
       id: "owner-user",
       role: "owner",
     };
-    sessions.set(token, user);
+    const db = c.get("db");
+    await db.insert(session).values({ token, user_id: null, role: "owner" });
     return c.json(
       {
         session_token: token,
@@ -231,7 +232,9 @@ router.openapi(loginRoute, async (c) => {
     role: "user",
     name: user.name,
   };
-  sessions.set(token, sessionUser);
+  await db
+    .insert(session)
+    .values({ token, user_id: user.id, role: "user", name: user.name });
   return c.json(
     {
       session_token: token,
@@ -249,12 +252,23 @@ router.openapi(getSessionRoute, async (c) => {
   }
 
   const token = authHeader.slice(7);
-  const user = sessions.get(token);
+  const db = c.get("db");
+  const rows = await db
+    .select()
+    .from(session)
+    .where(eq(session.token, token))
+    .limit(1);
 
-  if (!user) {
+  if (rows.length === 0) {
     return c.json({ authenticated: false }, 200);
   }
 
+  const row = rows[0];
+  const user = {
+    id: row.user_id ?? "owner-user",
+    role: row.role as "owner" | "user",
+    ...(row.name ? { name: row.name } : {}),
+  };
   return c.json(
     { authenticated: true, user: toSessionResponseUser(user) },
     200,
@@ -266,7 +280,8 @@ router.openapi(logoutRoute, async (c) => {
   const authHeader = c.req.header("Authorization");
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
-    sessions.delete(token);
+    const db = c.get("db");
+    await db.delete(session).where(eq(session.token, token));
   }
   return c.json({ success: true }, 200);
 });

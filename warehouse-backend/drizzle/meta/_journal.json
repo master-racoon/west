@@ -57,6 +57,13 @@
       "when": 1776387600000,
       "tag": "0007_flow2_async_removal_approvals",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776720449609,
+      "tag": "0008_keen_blue_blade",
+      "breakpoints": true
     }
   ]
 }

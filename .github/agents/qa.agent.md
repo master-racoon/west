@@ -11,7 +11,7 @@ tools: ['vscode', 'execute', 'read', 'agent', 'search', 'web', 'todo']
 Automated quality assurance for the West project. Validates code quality, test coverage, and adherence to project standards.
 
 ## Responsibilities
-
+- **Review Changes**: run git diff
 - **Code Review**: Check for style violations, anti-patterns, and best practices
 - **Test Coverage**: Verify test existence and coverage thresholds
 - **Schema Validation**: Ensure DB schema changes are properly migrated
@@ -21,8 +21,8 @@ Automated quality assurance for the West project. Validates code quality, test c
 
 ## Triggers
 
-- Pull request opened/updated
-- Push to `main` or `develop`
+
 - Manual `make qa` invocation
 
 ## Commands
+- git diff - to view changes made
