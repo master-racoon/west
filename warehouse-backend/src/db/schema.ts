@@ -11,6 +11,7 @@ import {
   text,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const warehouse = pgTable("warehouse", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -41,13 +42,35 @@ export const bin = pgTable(
   }),
 );
 
-export const item = pgTable("item", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 200 }).notNull(),
-  description: text("description"),
-  created_at: timestamp("created_at").defaultNow().notNull(),
-  updated_at: timestamp("updated_at").defaultNow(),
-});
+export const item = pgTable(
+  "item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow(),
+  },
+  () => ({}),
+);
+
+export const itemSku = pgTable(
+  "item_sku",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    item_id: uuid("item_id").notNull(),
+    sku: varchar("sku", { length: 100 }).notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    fk_item: foreignKey({
+      columns: [table.item_id],
+      foreignColumns: [item.id],
+    }).onDelete("cascade"),
+    uq_item_sku_value: uniqueIndex("idx_item_sku_unique").on(table.sku),
+    idx_item_sku_item_id: index("idx_item_sku_item_id").on(table.item_id),
+  }),
+);
 
 export const barcode = pgTable(
   "barcode",

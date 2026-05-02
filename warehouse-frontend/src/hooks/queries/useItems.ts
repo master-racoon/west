@@ -5,6 +5,8 @@ export interface Item {
   id: string;
   name: string;
   description?: string;
+  skus: string[];
+  sku_count: number;
   barcodes: string[];
   barcode_count: number;
   created_at: string;
@@ -13,6 +15,7 @@ export interface Item {
 export interface CreateItemRequest {
   name: string;
   description?: string;
+  skus?: string[];
   barcodes?: string[];
 }
 
@@ -63,6 +66,19 @@ export function useAddBarcode() {
   return useMutation({
     mutationFn: ({ itemId, barcode }: { itemId: string; barcode: string }) =>
       client.items.addBarcode(itemId, { barcode }),
+    onSuccess: (item) => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.setQueryData(["items", item.id], item);
+    },
+  });
+}
+
+export function useAddSku() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ itemId, sku }: { itemId: string; sku: string }) =>
+      client.items.addSku(itemId, { sku }),
     onSuccess: (item) => {
       queryClient.invalidateQueries({ queryKey: ["items"] });
       queryClient.setQueryData(["items", item.id], item);

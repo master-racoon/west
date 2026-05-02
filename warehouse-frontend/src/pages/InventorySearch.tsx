@@ -41,7 +41,7 @@ export function InventorySearchPage() {
             Inventory Explorer
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            Search items by name, barcode, or ID to view stock levels and
+            Search items by name, SKU, barcode, or ID to view stock levels and
             movement history.
           </p>
         </div>
@@ -52,7 +52,7 @@ export function InventorySearchPage() {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, barcode, or item ID..."
+            placeholder="Search by name, SKU, barcode, or item ID..."
             className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           {showSpinner && (
@@ -89,6 +89,14 @@ export function InventorySearchPage() {
                       <p className="truncate text-sm font-medium text-gray-900">
                         {item.name}
                       </p>
+                      {item.skus.length > 0 && (
+                        <p className="truncate text-xs font-medium uppercase tracking-wide text-blue-700 mt-0.5">
+                          SKUs: {item.skus.slice(0, 3).join(", ")}
+                          {item.skus.length > 3
+                            ? ` +${item.skus.length - 3} more`
+                            : ""}
+                        </p>
+                      )}
                       {item.description && (
                         <p className="truncate text-xs text-gray-500 mt-0.5">
                           {item.description}

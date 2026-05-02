@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ApiError, getApiErrorMessage } from "../lib/api";
 import {
+  useAddSku,
   useAddBarcode,
   useCreateItem,
   useItemById,
@@ -9,11 +10,11 @@ import {
 import { useAuthStore } from "../stores/authStore";
 import { ScanOverlay } from "../components/ScanOverlay";
 
-function normalizeBarcodeInputs(values: string[]) {
+function normalizeInputs(values: string[]) {
   return values.map((value) => value.trim()).filter(Boolean);
 }
 
-function duplicateBarcode(values: string[]) {
+function duplicateValue(values: string[]) {
   const seen = new Set<string>();
 
   for (const value of values) {
@@ -27,6 +28,14 @@ function duplicateBarcode(values: string[]) {
   return null;
 }
 
+function formatSkuSummary(skus: string[]) {
+  if (skus.length === 0) {
+    return null;
+  }
+
+  return `SKUs: ${skus.slice(0, 3).join(", ")}${skus.length > 3 ? ` +${skus.length - 3} more` : ""}`;
+}
+
 export function ProductsPage() {
   const { user } = useAuthStore();
   const isOwner = user?.role === "owner";
@@ -35,22 +44,30 @@ export function ProductsPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [skuInputs, setSkuInputs] = useState<string[]>([""]);
   const [barcodeInputs, setBarcodeInputs] = useState<string[]>([""]);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [skuError, setSkuError] = useState<string | null>(null);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [newSku, setNewSku] = useState("");
+  const [newSkuError, setNewSkuError] = useState<string | null>(null);
+  const [newSkuSuccess, setNewSkuSuccess] = useState<string | null>(null);
   const [newBarcode, setNewBarcode] = useState("");
   const [newBarcodeError, setNewBarcodeError] = useState<string | null>(null);
   const [newBarcodeSuccess, setNewBarcodeSuccess] = useState<string | null>(
     null,
   );
   const [showAddBarcodeScanner, setShowAddBarcodeScanner] = useState(false);
-  const [showCreateBarcodeScanner, setShowCreateBarcodeScanner] = useState<number | null>(null);
+  const [showCreateBarcodeScanner, setShowCreateBarcodeScanner] = useState<
+    number | null
+  >(null);
 
   const itemsQuery = useItems();
   const itemQuery = useItemById(selectedItemId);
   const createItemMutation = useCreateItem();
+  const addSkuMutation = useAddSku();
   const addBarcodeMutation = useAddBarcode();
 
   const filteredItems = useMemo(() => {
@@ -68,6 +85,9 @@ export function ProductsPage() {
 
       return (
         item.name.toLowerCase().includes(normalizedSearch) ||
+        item.skus.some((value) =>
+          value.toLowerCase().includes(normalizedSearch),
+        ) ||
         item.description?.toLowerCase().includes(normalizedSearch) ||
         barcodeMatch
       );
@@ -93,10 +113,32 @@ export function ProductsPage() {
   const resetCreateForm = () => {
     setName("");
     setDescription("");
+    setSkuInputs([""]);
     setBarcodeInputs([""]);
     setNameError(null);
+    setSkuError(null);
     setBarcodeError(null);
     setFormError(null);
+  };
+
+  const handleSkuChange = (index: number, value: string) => {
+    setSkuInputs((current) =>
+      current.map((entry, currentIndex) =>
+        currentIndex === index ? value : entry,
+      ),
+    );
+  };
+
+  const addSkuInput = () => {
+    setSkuInputs((current) => [...current, ""]);
+  };
+
+  const removeSkuInput = (index: number) => {
+    setSkuInputs((current) =>
+      current.length === 1
+        ? [""]
+        : current.filter((_, currentIndex) => currentIndex !== index),
+    );
   };
 
   const handleBarcodeChange = (index: number, value: string) => {
@@ -124,10 +166,13 @@ export function ProductsPage() {
 
     const trimmedName = name.trim();
     const trimmedDescription = description.trim();
-    const barcodes = normalizeBarcodeInputs(barcodeInputs);
-    const duplicateValue = duplicateBarcode(barcodes);
+    const skus = normalizeInputs(skuInputs);
+    const barcodes = normalizeInputs(barcodeInputs);
+    const duplicateSku = duplicateValue(skus);
+    const duplicateBarcodeValue = duplicateValue(barcodes);
 
     setNameError(null);
+    setSkuError(null);
     setBarcodeError(null);
     setFormError(null);
     setFormSuccess(null);
@@ -147,9 +192,14 @@ export function ProductsPage() {
       return;
     }
 
-    if (duplicateValue) {
+    if (duplicateSku) {
+      setSkuError(`SKU \"${duplicateSku}\" is duplicated in this form`);
+      return;
+    }
+
+    if (duplicateBarcodeValue) {
       setBarcodeError(
-        `Barcode \"${duplicateValue}\" is duplicated in this form`,
+        `Barcode \"${duplicateBarcodeValue}\" is duplicated in this form`,
       );
       return;
     }
@@ -158,6 +208,7 @@ export function ProductsPage() {
       const createdItem = await createItemMutation.mutateAsync({
         name: trimmedName,
         ...(trimmedDescription ? { description: trimmedDescription } : {}),
+        ...(skus.length ? { skus } : {}),
         ...(barcodes.length ? { barcodes } : {}),
       });
 
@@ -166,7 +217,17 @@ export function ProductsPage() {
       setFormSuccess("Product created");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        setBarcodeError(getApiErrorMessage(error, "Barcode already exists"));
+        const message = getApiErrorMessage(
+          error,
+          "Barcode or SKU already exists",
+        );
+
+        if (message.toLowerCase().includes("sku")) {
+          setSkuError(message);
+          return;
+        }
+
+        setBarcodeError(message);
         return;
       }
 
@@ -226,6 +287,56 @@ export function ProductsPage() {
       }
 
       setNewBarcodeError(getApiErrorMessage(error, "Failed to add barcode"));
+    }
+  };
+
+  const handleAddSku = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedSku = newSku.trim();
+    setNewSkuError(null);
+    setNewSkuSuccess(null);
+
+    if (!selectedItemId) {
+      setNewSkuError("Select a product before adding a SKU");
+      return;
+    }
+
+    if (!trimmedSku) {
+      setNewSkuError("SKU is required");
+      return;
+    }
+
+    if (trimmedSku.length > 100) {
+      setNewSkuError("SKU must be 100 characters or less");
+      return;
+    }
+
+    try {
+      const updatedItem = await addSkuMutation.mutateAsync({
+        itemId: selectedItemId,
+        sku: trimmedSku,
+      });
+
+      setNewSku("");
+      setNewSkuSuccess(`SKU added to ${updatedItem.name}`);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setNewSkuError(getApiErrorMessage(error, "SKU already exists"));
+        return;
+      }
+
+      if (error instanceof ApiError && error.status === 403) {
+        setNewSkuError("Only owners can add SKUs");
+        return;
+      }
+
+      if (error instanceof ApiError && error.status === 404) {
+        setNewSkuError("Product not found");
+        return;
+      }
+
+      setNewSkuError(getApiErrorMessage(error, "Failed to add SKU"));
     }
   };
 
@@ -295,6 +406,54 @@ export function ProductsPage() {
                   />
                   {nameError && (
                     <p className="mt-2 text-sm text-red-600">{nameError}</p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <label className="block text-sm font-medium text-gray-700">
+                      SKUs
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addSkuInput}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                      disabled={createItemMutation.isPending}
+                    >
+                      Add SKU field
+                    </button>
+                  </div>
+
+                  {skuInputs.map((value, index) => (
+                    <div
+                      key={`${index}-${skuInputs.length}`}
+                      className="flex gap-3"
+                    >
+                      <input
+                        id={index === 0 ? "product-sku" : undefined}
+                        type="text"
+                        value={value}
+                        onChange={(event) =>
+                          handleSkuChange(index, event.target.value)
+                        }
+                        maxLength={100}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        placeholder="Optional SKU"
+                        disabled={createItemMutation.isPending}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSkuInput(index)}
+                        className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                        disabled={createItemMutation.isPending}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+
+                  {skuError && (
+                    <p className="text-sm text-red-600">{skuError}</p>
                   )}
                 </div>
 
@@ -392,7 +551,7 @@ export function ProductsPage() {
                   Product List
                 </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Search by product name, description, or barcode.
+                  Search by product name, SKU, description, or barcode.
                 </p>
               </div>
             </div>
@@ -402,7 +561,7 @@ export function ProductsPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="block w-full px-3 py-2 mb-4 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Search products or scan a barcode"
+              placeholder="Search products by name, SKU, or barcode"
             />
 
             {itemsQuery.isLoading ? (
@@ -438,6 +597,11 @@ export function ProductsPage() {
                           <h3 className="font-semibold text-gray-900">
                             {item.name}
                           </h3>
+                          {item.skus.length > 0 && (
+                            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-blue-700">
+                              {formatSkuSummary(item.skus)}
+                            </p>
+                          )}
                           {item.description && (
                             <p className="mt-1 text-sm text-gray-600 line-clamp-2">
                               {item.description}
@@ -494,6 +658,11 @@ export function ProductsPage() {
                       <h3 className="text-2xl font-bold text-gray-900">
                         {selectedItem.name}
                       </h3>
+                      {selectedItem.skus.length > 0 && (
+                        <p className="mt-2 text-sm font-medium uppercase tracking-wide text-blue-700">
+                          {formatSkuSummary(selectedItem.skus)}
+                        </p>
+                      )}
                       <p className="mt-2 text-sm text-gray-600">
                         {selectedItem.description ||
                           "No description recorded for this product."}
@@ -504,6 +673,28 @@ export function ProductsPage() {
                       {selectedItem.barcode_count === 1 ? "" : "s"}
                     </span>
                   </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                    Registered SKUs
+                  </h4>
+                  {selectedItem.skus.length === 0 ? (
+                    <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
+                      This product has no SKUs yet.
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {selectedItem.skus.map((sku) => (
+                        <li
+                          key={sku}
+                          className="rounded-md border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700"
+                        >
+                          {sku}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <div>
@@ -530,51 +721,94 @@ export function ProductsPage() {
                 </div>
 
                 {isOwner && (
-                  <form className="space-y-3" onSubmit={handleAddBarcode}>
-                    <div className="flex items-center justify-between gap-4">
-                      <h4 className="text-sm font-semibold text-gray-900">
-                        Add Barcode
-                      </h4>
-                    </div>
-
-                    {newBarcodeError && (
-                      <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
-                        {newBarcodeError}
+                  <div className="space-y-6">
+                    <form className="space-y-3" onSubmit={handleAddSku}>
+                      <div className="flex items-center justify-between gap-4">
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          Add SKU
+                        </h4>
                       </div>
-                    )}
 
-                    {newBarcodeSuccess && (
-                      <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
-                        {newBarcodeSuccess}
+                      {newSkuError && (
+                        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+                          {newSkuError}
+                        </div>
+                      )}
+
+                      {newSkuSuccess && (
+                        <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
+                          {newSkuSuccess}
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                        <input
+                          type="text"
+                          value={newSku}
+                          onChange={(event) => setNewSku(event.target.value)}
+                          maxLength={100}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          placeholder="Enter a new SKU"
+                          disabled={addSkuMutation.isPending}
+                        />
+                        <button
+                          type="submit"
+                          className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={addSkuMutation.isPending}
+                        >
+                          {addSkuMutation.isPending ? "Saving..." : "Add"}
+                        </button>
                       </div>
-                    )}
+                    </form>
 
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        value={newBarcode}
-                        onChange={(event) => setNewBarcode(event.target.value)}
-                        maxLength={200}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        placeholder="Scan or enter a new barcode"
-                        disabled={addBarcodeMutation.isPending}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowAddBarcodeScanner(true)}
-                        className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        📷
-                      </button>
-                      <button
-                        type="submit"
-                        className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={addBarcodeMutation.isPending}
-                      >
-                        {addBarcodeMutation.isPending ? "Saving..." : "Add"}
-                      </button>
-                    </div>
-                  </form>
+                    <form className="space-y-3" onSubmit={handleAddBarcode}>
+                      <div className="flex items-center justify-between gap-4">
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          Add Barcode
+                        </h4>
+                      </div>
+
+                      {newBarcodeError && (
+                        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+                          {newBarcodeError}
+                        </div>
+                      )}
+
+                      {newBarcodeSuccess && (
+                        <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
+                          {newBarcodeSuccess}
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                        <input
+                          type="text"
+                          value={newBarcode}
+                          onChange={(event) =>
+                            setNewBarcode(event.target.value)
+                          }
+                          maxLength={200}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          placeholder="Scan or enter a new barcode"
+                          disabled={addBarcodeMutation.isPending}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAddBarcodeScanner(true)}
+                          className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                          📷
+                        </button>
+                        <button
+                          type="submit"
+                          className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={addBarcodeMutation.isPending}
+                        >
+                          {addBarcodeMutation.isPending ? "Saving..." : "Add"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 )}
               </div>
             )}

@@ -1624,7 +1624,7 @@
           "Items"
         ],
         "operationId": "createItem",
-        "summary": "Create an item with optional barcodes",
+        "summary": "Create an item with optional barcodes and SKUs",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1639,6 +1639,15 @@
                   "description": {
                     "type": "string",
                     "maxLength": 1000
+                  },
+                  "skus": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "minItems": 1
                   },
                   "barcodes": {
                     "type": "array",
@@ -1675,6 +1684,16 @@
                     "description": {
                       "type": "string"
                     },
+                    "skus": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sku_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "barcodes": {
                       "type": "array",
                       "items": {
@@ -1693,6 +1712,8 @@
                   "required": [
                     "id",
                     "name",
+                    "skus",
+                    "sku_count",
                     "barcodes",
                     "barcode_count",
                     "created_at"
@@ -1720,7 +1741,7 @@
             }
           },
           "409": {
-            "description": "Barcode already exists",
+            "description": "Barcode or SKU already exists",
             "content": {
               "application/json": {
                 "schema": {
@@ -1765,6 +1786,16 @@
                       "description": {
                         "type": "string"
                       },
+                      "skus": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "sku_count": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
                       "barcodes": {
                         "type": "array",
                         "items": {
@@ -1783,6 +1814,8 @@
                     "required": [
                       "id",
                       "name",
+                      "skus",
+                      "sku_count",
                       "barcodes",
                       "barcode_count",
                       "created_at"
@@ -1852,6 +1885,12 @@
                       "description": {
                         "type": "string"
                       },
+                      "skus": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
                       "barcodes": {
                         "type": "array",
                         "items": {
@@ -1865,6 +1904,7 @@
                     "required": [
                       "id",
                       "name",
+                      "skus",
                       "barcodes",
                       "total_quantity"
                     ]
@@ -1930,6 +1970,16 @@
                     "description": {
                       "type": "string"
                     },
+                    "skus": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sku_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "barcodes": {
                       "type": "array",
                       "items": {
@@ -1948,6 +1998,8 @@
                   "required": [
                     "id",
                     "name",
+                    "skus",
+                    "sku_count",
                     "barcodes",
                     "barcode_count",
                     "created_at"
@@ -2050,6 +2102,16 @@
                     "description": {
                       "type": "string"
                     },
+                    "skus": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sku_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "barcodes": {
                       "type": "array",
                       "items": {
@@ -2068,6 +2130,8 @@
                   "required": [
                     "id",
                     "name",
+                    "skus",
+                    "sku_count",
                     "barcodes",
                     "barcode_count",
                     "created_at"
@@ -2114,6 +2178,156 @@
           },
           "409": {
             "description": "Barcode already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{id}/skus": {
+      "post": {
+        "tags": [
+          "Items"
+        ],
+        "operationId": "addSku",
+        "summary": "Add a SKU to an item",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sku": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "sku"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "skus": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "sku_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "barcodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "barcode_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "skus",
+                    "sku_count",
+                    "barcodes",
+                    "barcode_count",
+                    "created_at"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "SKU already exists",
             "content": {
               "application/json": {
                 "schema": {

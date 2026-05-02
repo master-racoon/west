@@ -171,11 +171,16 @@ export const client = {
     createItem: (data: {
       name: string;
       description?: string;
+      skus?: string[];
       barcodes?: string[];
     }) => withAuthHandling(apiClient.items.createItem({ requestBody: data })),
     addBarcode: (itemId: string, data: { barcode: string }) =>
       withAuthHandling(
         apiClient.items.addBarcode({ id: itemId, requestBody: data }),
+      ),
+    addSku: (itemId: string, data: { sku: string }) =>
+      withAuthHandling(
+        apiClient.items.addSku({ id: itemId, requestBody: data }),
       ),
     searchItems: (q: string) =>
       withAuthHandling(apiClient.items.searchItems({ q })),
@@ -191,5 +196,67 @@ export const client = {
       withAuthHandling(apiClient.barcodes.lookupItemByBarcode({ barcode })),
   },
 };
+
+export interface ResolvedItemReference {
+  id: string;
+  name: string;
+  skus: string[];
+}
+
+export async function resolveItemReference(
+  identifier: string,
+): Promise<ResolvedItemReference> {
+  const trimmed = identifier.trim();
+
+  try {
+    const barcodeResult = await client.barcodes.lookupItemByBarcode(trimmed);
+    const item = await client.items.getItem(barcodeResult.item_id);
+
+    return {
+      id: item.id,
+      name: item.name,
+      skus: item.skus,
+    };
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) {
+      throw error;
+    }
+  }
+
+  let directLookupError: unknown;
+
+  try {
+    const item = await client.items.getItem(trimmed);
+
+    return {
+      id: item.id,
+      name: item.name,
+      skus: item.skus,
+    };
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) {
+      throw error;
+    }
+
+    directLookupError = error;
+  }
+
+  const results = await client.items.searchItems(trimmed);
+  const exactSkuMatch = results.find((item) =>
+    item.skus.some((sku) => sku.toLowerCase() === trimmed.toLowerCase()),
+  );
+
+  if (exactSkuMatch) {
+    return {
+      id: exactSkuMatch.id,
+      name: exactSkuMatch.name,
+      skus: exactSkuMatch.skus,
+    };
+  }
+
+  throw directLookupError instanceof Error
+    ? directLookupError
+    : new Error("Item not found");
+}
 
 export { ApiError };

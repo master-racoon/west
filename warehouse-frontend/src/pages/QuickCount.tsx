@@ -13,12 +13,21 @@ import {
   useInventoryBalance,
 } from "../hooks/queries/useInventory";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
-import { ApiError, client, getApiErrorMessage } from "../lib/api";
+import { ApiError, getApiErrorMessage, resolveItemReference } from "../lib/api";
 import { ScanOverlay } from "../components/ScanOverlay";
 
 interface ResolvedItem {
   id: string;
   name: string;
+  skus: string[];
+}
+
+function formatSkuSummary(skus: string[]) {
+  if (skus.length === 0) {
+    return null;
+  }
+
+  return `SKUs: ${skus.slice(0, 3).join(", ")}${skus.length > 3 ? ` +${skus.length - 3} more` : ""}`;
 }
 
 interface QuickCountPageProps {
@@ -166,39 +175,16 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
     if (!value) {
       setResolvedItem(null);
       setSelectedItemId("");
-      showBarcodeError("Scan or select an item");
+      showBarcodeError("Scan or enter a barcode, SKU, or item ID");
       return;
     }
 
     setIsResolvingItem(true);
 
     try {
-      const barcodeResult = await client.barcodes.lookupItemByBarcode(value);
-      setResolvedItem({
-        id: barcodeResult.item_id,
-        name: barcodeResult.item_name,
-      });
-      return;
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 404) {
-        setResolvedItem(null);
-        setSelectedItemId("");
-        showBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
-        return;
-      }
-    } finally {
-      setIsResolvingItem(false);
-    }
-
-    setIsResolvingItem(true);
-
-    try {
-      const itemResult = await client.items.getItem(value);
-      setResolvedItem({
-        id: itemResult.id,
-        name: itemResult.name,
-      });
-      setSelectedItemId(itemResult.id);
+      const resolved = await resolveItemReference(value);
+      setResolvedItem(resolved);
+      setSelectedItemId(resolved.id);
     } catch (error) {
       setResolvedItem(null);
       setSelectedItemId("");
@@ -207,7 +193,6 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
         showBarcodeError("Item not found");
         return;
       }
-
       showBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
     } finally {
       setIsResolvingItem(false);
@@ -238,6 +223,7 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
     setResolvedItem({
       id: selectedItem.id,
       name: selectedItem.name,
+      skus: selectedItem.skus,
     });
   };
 
@@ -259,17 +245,12 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
       if (!trimmed) return;
       setIsResolvingItem(true);
       try {
-        const barcodeResult = await client.barcodes.lookupItemByBarcode(trimmed);
-        setResolvedItem({ id: barcodeResult.item_id, name: barcodeResult.item_name });
+        const resolved = await resolveItemReference(trimmed);
+        setResolvedItem(resolved);
+        setSelectedItemId(resolved.id);
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) {
-          try {
-            const itemResult = await client.items.getItem(trimmed);
-            setResolvedItem({ id: itemResult.id, name: itemResult.name });
-            setSelectedItemId(itemResult.id);
-          } catch {
-            showBarcodeError("Item not found");
-          }
+          showBarcodeError("Item not found");
         } else {
           showBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
         }
@@ -469,7 +450,7 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
                   htmlFor="quick-count-barcode-or-item-id"
                   className="block text-sm font-medium text-gray-700 mb-2"
                 >
-                  Barcode or Item ID
+                  Barcode, SKU, or Item ID
                 </label>
                 <input
                   id="quick-count-barcode-or-item-id"
@@ -491,7 +472,7 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
                   onKeyDown={handleBarcodeKeyDown}
                   autoFocus
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Scan barcode or paste item id"
+                  placeholder="Scan barcode or enter SKU or item ID"
                   disabled={countAdjustMutation.isPending}
                 />
               </div>
@@ -531,6 +512,9 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
                 {(itemsQuery.data || []).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
+                    {item.skus.length > 0
+                      ? ` [${formatSkuSummary(item.skus)}]`
+                      : ""}
                     {item.barcodes[0] ? ` (${item.barcodes[0]})` : ""}
                   </option>
                 ))}
@@ -540,8 +524,8 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
             <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-2">
               <p>
                 {resolvedItem
-                  ? `Resolved item: ${resolvedItem.name}`
-                  : "Resolve a barcode or pick an item before recording a count."}
+                  ? `Resolved item: ${resolvedItem.name}${resolvedItem.skus.length > 0 ? ` (${formatSkuSummary(resolvedItem.skus)})` : ""}`
+                  : "Resolve a barcode, SKU, or item before recording a count."}
               </p>
               <p>
                 {selectedWarehouse

@@ -64,6 +64,13 @@
       "when": 1776720449609,
       "tag": "0008_keen_blue_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777720608473,
+      "tag": "0009_dapper_the_stranger",
+      "breakpoints": true
     }
   ]
 }

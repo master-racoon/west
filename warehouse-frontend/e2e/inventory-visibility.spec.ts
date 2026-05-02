@@ -17,7 +17,7 @@ async function searchInventory(page: Page, query: string) {
     { timeout: 15000 },
   );
   await page
-    .getByPlaceholder("Search by name, barcode, or item ID...")
+    .getByPlaceholder(/search by name,.*barcode, or item id/i)
     .pressSequentially(query);
   await responsePromise;
 }

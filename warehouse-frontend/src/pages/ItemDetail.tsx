@@ -88,6 +88,11 @@ export function ItemDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900 truncate">
             {itemData.name}
           </h1>
+          {itemData.skus.length > 0 && (
+            <p className="mt-1 text-sm font-medium uppercase tracking-wide text-blue-700">
+              SKUs: {itemData.skus.join(", ")}
+            </p>
+          )}
           {itemData.description && (
             <p className="mt-1 text-sm text-gray-600">{itemData.description}</p>
           )}

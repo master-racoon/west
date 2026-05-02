@@ -8,13 +8,14 @@ import {
   useRemovalApprovals,
 } from "../hooks/queries/useInventory";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
-import { ApiError, client, getApiErrorMessage } from "../lib/api";
+import { ApiError, getApiErrorMessage, resolveItemReference } from "../lib/api";
 import { useAuthStore } from "../stores/authStore";
 import { ScanOverlay } from "../components/ScanOverlay";
 
 interface ResolvedItem {
   id: string;
   name: string;
+  sku?: string;
 }
 
 interface RemoveStockPageProps {
@@ -150,37 +151,14 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
 
     if (!value) {
       setResolvedItem(null);
-      setBarcodeError("Scan or enter a barcode");
+      setBarcodeError("Scan or enter a barcode, SKU, or item ID");
       return;
     }
 
     setIsResolvingItem(true);
 
     try {
-      const barcodeResult = await client.barcodes.lookupItemByBarcode(value);
-      setResolvedItem({
-        id: barcodeResult.item_id,
-        name: barcodeResult.item_name,
-      });
-      return;
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 404) {
-        setResolvedItem(null);
-        setBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
-        return;
-      }
-    } finally {
-      setIsResolvingItem(false);
-    }
-
-    setIsResolvingItem(true);
-
-    try {
-      const itemResult = await client.items.getItem(value);
-      setResolvedItem({
-        id: itemResult.id,
-        name: itemResult.name,
-      });
+      setResolvedItem(await resolveItemReference(value));
     } catch (error) {
       setResolvedItem(null);
 
@@ -188,7 +166,6 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
         setBarcodeError("Item not found");
         return;
       }
-
       setBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
     } finally {
       setIsResolvingItem(false);
@@ -211,20 +188,10 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
       if (!trimmed) return;
       setIsResolvingItem(true);
       try {
-        const barcodeResult =
-          await client.barcodes.lookupItemByBarcode(trimmed);
-        setResolvedItem({
-          id: barcodeResult.item_id,
-          name: barcodeResult.item_name,
-        });
+        setResolvedItem(await resolveItemReference(trimmed));
       } catch (error) {
         if (error instanceof ApiError && error.status === 404) {
-          try {
-            const itemResult = await client.items.getItem(trimmed);
-            setResolvedItem({ id: itemResult.id, name: itemResult.name });
-          } catch {
-            setBarcodeError("Item not found");
-          }
+          setBarcodeError("Item not found");
         } else {
           setBarcodeError(getApiErrorMessage(error, "Failed to resolve item"));
         }
@@ -427,7 +394,7 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
                     htmlFor="remove-barcode-or-item-id"
                     className="block text-sm font-medium text-gray-700 mb-2"
                   >
-                    Barcode or Item ID
+                    Barcode, SKU, or Item ID
                   </label>
                   <input
                     id="remove-barcode-or-item-id"
@@ -447,7 +414,7 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
                     onKeyDown={handleBarcodeKeyDown}
                     autoFocus
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Scan barcode or paste item id"
+                    placeholder="Scan barcode or enter SKU or item ID"
                     disabled={removeStockMutation.isPending}
                   />
                 </div>
@@ -472,8 +439,8 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
               <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-2">
                 <p>
                   {resolvedItem
-                    ? `Resolved item: ${resolvedItem.name}`
-                    : "Resolve a barcode to confirm the item before removing stock."}
+                    ? `Resolved item: ${resolvedItem.name}${resolvedItem.sku ? ` (SKU: ${resolvedItem.sku})` : ""}`
+                    : "Resolve a barcode, SKU, or item ID before removing stock."}
                 </p>
                 <p>
                   {selectedWarehouse

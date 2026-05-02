@@ -1,7 +1,15 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 import { eq, ilike, inArray, like, or, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../authorization/middleware";
-import { barcode, bin, item, movement, warehouse, users } from "../db/schema";
+import {
+  barcode,
+  bin,
+  item,
+  itemSku,
+  movement,
+  warehouse,
+  users,
+} from "../db/schema";
 import { ConflictError, NotFoundError } from "../utils/errors";
 
 const itemsRouter = new OpenAPIHono<{ Variables: { db: any; auth: any } }>();
@@ -24,6 +32,7 @@ const BarcodeLookupParams = z.object({
 export const CreateItemRequest = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().max(1000).optional(),
+  skus: z.array(z.string().trim().min(1).max(100)).min(1).optional(),
   barcodes: z.array(z.string().trim().min(1).max(200)).min(1).optional(),
 });
 
@@ -35,10 +44,18 @@ export const AddBarcodeRequest = z.object({
 
 export type AddBarcodeRequest = z.infer<typeof AddBarcodeRequest>;
 
+export const AddSkuRequest = z.object({
+  sku: z.string().trim().min(1).max(100),
+});
+
+export type AddSkuRequest = z.infer<typeof AddSkuRequest>;
+
 export const ItemResponse = z.object({
   id: z.string().uuid(),
   name: z.string(),
   description: z.string().optional(),
+  skus: z.array(z.string()),
+  sku_count: z.number().int().nonnegative(),
   barcodes: z.array(z.string()),
   barcode_count: z.number().int().nonnegative(),
   created_at: z.string().datetime(),
@@ -58,7 +75,7 @@ const createItemRoute = createRoute({
   path: "/",
   tags: ["Items"],
   operationId: "createItem",
-  summary: "Create an item with optional barcodes",
+  summary: "Create an item with optional barcodes and SKUs",
   request: {
     body: {
       content: {
@@ -86,7 +103,7 @@ const createItemRoute = createRoute({
       },
     },
     409: {
-      description: "Barcode already exists",
+      description: "Barcode or SKU already exists",
       content: {
         "application/json": {
           schema: ErrorResponse,
@@ -131,6 +148,7 @@ const SearchItemsResponse = z.array(
     id: z.string().uuid(),
     name: z.string(),
     description: z.string().optional(),
+    skus: z.array(z.string()),
     barcodes: z.array(z.string()),
     total_quantity: z.number().int(),
   }),
@@ -307,6 +325,58 @@ const addBarcodeRoute = createRoute({
   },
 });
 
+const addSkuRoute = createRoute({
+  method: "post",
+  path: "/{id}/skus",
+  tags: ["Items"],
+  operationId: "addSku",
+  summary: "Add a SKU to an item",
+  request: {
+    params: ItemIdParams,
+    body: {
+      content: {
+        "application/json": {
+          schema: AddSkuRequest,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Updated item",
+      content: {
+        "application/json": {
+          schema: ItemResponse,
+        },
+      },
+    },
+    403: {
+      description: "Owner role required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Item not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    409: {
+      description: "SKU already exists",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
 const lookupBarcodeRoute = createRoute({
   method: "get",
   path: "/lookup/{barcode}",
@@ -425,7 +495,11 @@ function normalizeDescription(description?: string) {
 }
 
 function normalizeBarcodes(values: string[] | undefined) {
-  return (values || []).map((value) => value.trim());
+  return (values || []).map((value) => value.trim()).filter(Boolean);
+}
+
+function normalizeSkus(values: string[] | undefined) {
+  return (values || []).map((value) => value.trim()).filter(Boolean);
 }
 
 function assertDistinctBarcodes(values: string[]) {
@@ -434,6 +508,18 @@ function assertDistinctBarcodes(values: string[]) {
   for (const value of values) {
     if (seen.has(value)) {
       throw new ConflictError(`Barcode \"${value}\" already exists`);
+    }
+
+    seen.add(value);
+  }
+}
+
+function assertDistinctSkus(values: string[]) {
+  const seen = new Set<string>();
+
+  for (const value of values) {
+    if (seen.has(value)) {
+      throw new ConflictError(`SKU \"${value}\" already exists`);
     }
 
     seen.add(value);
@@ -457,6 +543,24 @@ async function assertBarcodesAvailable(db: any, values: string[]) {
     throw new ConflictError(
       `Barcode \"${existing[0].barcode}\" already exists`,
     );
+  }
+}
+
+async function assertSkusAvailable(db: any, values: string[]) {
+  if (!values.length) {
+    return;
+  }
+
+  const existing = await db
+    .select({
+      sku: itemSku.sku,
+    })
+    .from(itemSku)
+    .where(inArray(itemSku.sku, values))
+    .limit(1);
+
+  if (existing.length > 0) {
+    throw new ConflictError(`SKU \"${existing[0].sku}\" already exists`);
   }
 }
 
@@ -484,9 +588,18 @@ async function getItemRecord(db: any, itemId: string) {
     .where(eq(barcode.item_id, itemId))
     .orderBy(barcode.created_at);
 
+  const itemSkus = await db
+    .select({
+      sku: itemSku.sku,
+    })
+    .from(itemSku)
+    .where(eq(itemSku.item_id, itemId))
+    .orderBy(itemSku.created_at);
+
   return toItemResponse(
     items[0],
     itemBarcodes.map((entry: { barcode: string }) => entry.barcode),
+    itemSkus.map((entry: { sku: string }) => entry.sku),
   );
 }
 
@@ -498,11 +611,14 @@ function toItemResponse(
     created_at: Date;
   },
   barcodes: string[],
+  skus: string[],
 ): ItemResponse {
   return {
     id: record.id,
     name: record.name,
     ...(record.description ? { description: record.description } : {}),
+    skus,
+    sku_count: skus.length,
     barcodes,
     barcode_count: barcodes.length,
     created_at: record.created_at.toISOString(),
@@ -515,9 +631,12 @@ itemsRouter.openapi(createItemRoute, async (c) => {
   const db = c.get("db");
   const data = c.req.valid("json");
   const itemBarcodes = normalizeBarcodes(data.barcodes);
+  const itemSkus = normalizeSkus(data.skus);
 
   assertDistinctBarcodes(itemBarcodes);
+  assertDistinctSkus(itemSkus);
   await assertBarcodesAvailable(db, itemBarcodes);
+  await assertSkusAvailable(db, itemSkus);
 
   const createdItems = await db
     .insert(item)
@@ -541,6 +660,15 @@ itemsRouter.openapi(createItemRoute, async (c) => {
       itemBarcodes.map((value) => ({
         item_id: createdItems[0].id,
         barcode: value,
+      })),
+    );
+  }
+
+  if (itemSkus.length > 0) {
+    await db.insert(itemSku).values(
+      itemSkus.map((value) => ({
+        item_id: createdItems[0].id,
+        sku: value,
       })),
     );
   }
@@ -584,6 +712,23 @@ itemsRouter.openapi(listItemsRoute, async (c) => {
     barcodesByItemId.set(record.item_id, values);
   }
 
+  const skuRecords = await db
+    .select({
+      item_id: itemSku.item_id,
+      sku: itemSku.sku,
+    })
+    .from(itemSku)
+    .where(inArray(itemSku.item_id, itemIds))
+    .orderBy(itemSku.created_at);
+
+  const skusByItemId = new Map<string, string[]>();
+
+  for (const record of skuRecords) {
+    const values = skusByItemId.get(record.item_id) || [];
+    values.push(record.sku);
+    skusByItemId.set(record.item_id, values);
+  }
+
   return c.json(
     itemRecords.map(
       (record: {
@@ -591,7 +736,12 @@ itemsRouter.openapi(listItemsRoute, async (c) => {
         name: string;
         description: string | null;
         created_at: Date;
-      }) => toItemResponse(record, barcodesByItemId.get(record.id) || []),
+      }) =>
+        toItemResponse(
+          record,
+          barcodesByItemId.get(record.id) || [],
+          skusByItemId.get(record.id) || [],
+        ),
     ),
   );
 });
@@ -603,6 +753,7 @@ itemsRouter.openapi(searchItemsRoute, async (c) => {
   const { q } = c.req.valid("query");
   const namePattern = `%${q}%`;
   const barcodePrefix = `${q}%`;
+  const skuPattern = `%${q}%`;
 
   const itemIdSet = new Set<string>();
 
@@ -613,6 +764,14 @@ itemsRouter.openapi(searchItemsRoute, async (c) => {
     .where(ilike(item.name, namePattern))
     .limit(10);
   for (const row of nameResults) itemIdSet.add(row.id);
+
+  // Search by SKU (case-insensitive substring)
+  const skuResults = await db
+    .select({ item_id: itemSku.item_id })
+    .from(itemSku)
+    .where(ilike(itemSku.sku, skuPattern))
+    .limit(10);
+  for (const row of skuResults) itemIdSet.add(row.item_id);
 
   // Search by barcode (exact or prefix)
   const barcodeResults = await db
@@ -661,6 +820,19 @@ itemsRouter.openapi(searchItemsRoute, async (c) => {
     barcodesByItemId.set(rec.item_id, arr);
   }
 
+  const skuRecords = await db
+    .select({ item_id: itemSku.item_id, sku: itemSku.sku })
+    .from(itemSku)
+    .where(inArray(itemSku.item_id, foundIds))
+    .orderBy(itemSku.created_at);
+
+  const skusByItemId = new Map<string, string[]>();
+  for (const rec of skuRecords) {
+    const arr = skusByItemId.get(rec.item_id) || [];
+    arr.push(rec.sku);
+    skusByItemId.set(rec.item_id, arr);
+  }
+
   const qtyRows = await db
     .select({
       item_id: movement.item_id,
@@ -685,6 +857,7 @@ itemsRouter.openapi(searchItemsRoute, async (c) => {
         id: record.id,
         name: record.name,
         ...(record.description ? { description: record.description } : {}),
+        skus: skusByItemId.get(record.id) || [],
         barcodes: barcodesByItemId.get(record.id) || [],
         total_quantity: quantityByItemId.get(record.id) || 0,
       }),
@@ -715,6 +888,26 @@ itemsRouter.openapi(addBarcodeRoute, async (c) => {
   await db.insert(barcode).values({
     item_id: id,
     barcode: value,
+  });
+
+  return c.json(await getItemRecord(db, id));
+});
+
+itemsRouter.openapi(addSkuRoute, async (c) => {
+  requireRole(c, "owner");
+
+  const db = c.get("db");
+  const { id } = c.req.valid("param");
+  const data = c.req.valid("json");
+  const value = data.sku.trim();
+
+  await getItemRecord(db, id);
+  assertDistinctSkus([value]);
+  await assertSkusAvailable(db, [value]);
+
+  await db.insert(itemSku).values({
+    item_id: id,
+    sku: value,
   });
 
   return c.json(await getItemRecord(db, id));

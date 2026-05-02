@@ -5,6 +5,7 @@ import {
   barcode,
   bin,
   item,
+  itemSku,
   movement,
   removalApproval,
   warehouse,
@@ -606,6 +607,18 @@ async function resolveItemId(db: any, barcodeOrItemId: string) {
 
   if (barcodeMatch.length > 0) {
     return barcodeMatch[0].item_id;
+  }
+
+  const skuMatch = await db
+    .select({
+      item_id: itemSku.item_id,
+    })
+    .from(itemSku)
+    .where(eq(itemSku.sku, barcodeValue))
+    .limit(1);
+
+  if (skuMatch.length > 0) {
+    return skuMatch[0].item_id;
   }
 
   const itemMatch = await db
