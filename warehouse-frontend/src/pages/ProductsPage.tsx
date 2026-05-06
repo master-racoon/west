@@ -6,6 +6,9 @@ import {
   useCreateItem,
   useItemById,
   useItems,
+  useUpdateItem,
+  useRemoveItemSku,
+  useRemoveItemBarcode,
 } from "../hooks/queries/useItems";
 import { useAuthStore } from "../stores/authStore";
 import { ScanOverlay } from "../components/ScanOverlay";
@@ -36,10 +39,13 @@ function formatSkuSummary(skus: string[]) {
   return `SKUs: ${skus.slice(0, 3).join(", ")}${skus.length > 3 ? ` +${skus.length - 3} more` : ""}`;
 }
 
+type Mode = "view" | "create" | "edit";
+
 export function ProductsPage() {
   const { user } = useAuthStore();
   const isOwner = user?.role === "owner";
 
+  const [mode, setMode] = useState<Mode>("view");
   const [search, setSearch] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -64,11 +70,24 @@ export function ProductsPage() {
     number | null
   >(null);
 
+  // Edit form state
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [newEditSku, setNewEditSku] = useState("");
+  const [editSkuError, setEditSkuError] = useState<string | null>(null);
+  const [newEditBarcode, setNewEditBarcode] = useState("");
+  const [editBarcodeError, setEditBarcodeError] = useState<string | null>(null);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+  const [showEditBarcodeScanner, setShowEditBarcodeScanner] = useState(false);
+
   const itemsQuery = useItems();
   const itemQuery = useItemById(selectedItemId);
   const createItemMutation = useCreateItem();
   const addSkuMutation = useAddSku();
   const addBarcodeMutation = useAddBarcode();
+  const updateItemMutation = useUpdateItem();
+  const removeSkuMutation = useRemoveItemSku();
+  const removeBarcodeMutation = useRemoveItemBarcode();
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -109,6 +128,19 @@ export function ProductsPage() {
       setSelectedItemId(filteredItems[0].id);
     }
   }, [filteredItems, itemsQuery.data, selectedItemId]);
+
+  // Sync edit state when entering edit mode or switching selected item
+  useEffect(() => {
+    if (mode === "edit" && itemQuery.data) {
+      setEditName(itemQuery.data.name);
+      setEditDescription(itemQuery.data.description ?? "");
+      setEditFormError(null);
+      setEditSkuError(null);
+      setEditBarcodeError(null);
+      setNewEditSku("");
+      setNewEditBarcode("");
+    }
+  }, [mode, selectedItemId, itemQuery.data]);
 
   const resetCreateForm = () => {
     setName("");
@@ -215,6 +247,7 @@ export function ProductsPage() {
       resetCreateForm();
       setSelectedItemId(createdItem.id);
       setFormSuccess("Product created");
+      setMode("view");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         const message = getApiErrorMessage(
@@ -340,7 +373,126 @@ export function ProductsPage() {
     }
   };
 
+  const handleUpdateItem = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedItemId) return;
+
+    setEditFormError(null);
+    const trimmedName = editName.trim();
+    const trimmedDescription = editDescription.trim();
+
+    if (!trimmedName) {
+      setEditFormError("Product name is required");
+      return;
+    }
+
+    if (trimmedName.length > 200) {
+      setEditFormError("Product name must be 200 characters or less");
+      return;
+    }
+
+    if (trimmedDescription.length > 1000) {
+      setEditFormError("Description must be 1000 characters or less");
+      return;
+    }
+
+    try {
+      await updateItemMutation.mutateAsync({
+        id: selectedItemId,
+        name: trimmedName,
+        description: trimmedDescription,
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        setEditFormError("Only owners can update products");
+        return;
+      }
+
+      if (error instanceof ApiError && error.status === 404) {
+        setEditFormError("Product not found");
+        return;
+      }
+
+      setEditFormError(getApiErrorMessage(error, "Failed to update product"));
+    }
+  };
+
+  const handleEditAddSku = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedItemId) return;
+
+    const trimmedSku = newEditSku.trim();
+    setEditSkuError(null);
+
+    if (!trimmedSku) {
+      setEditSkuError("SKU is required");
+      return;
+    }
+
+    if (trimmedSku.length > 100) {
+      setEditSkuError("SKU must be 100 characters or less");
+      return;
+    }
+
+    try {
+      await addSkuMutation.mutateAsync({ itemId: selectedItemId, sku: trimmedSku });
+      setNewEditSku("");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setEditSkuError(getApiErrorMessage(error, "SKU already exists"));
+        return;
+      }
+
+      if (error instanceof ApiError && error.status === 403) {
+        setEditSkuError("Only owners can add SKUs");
+        return;
+      }
+
+      setEditSkuError(getApiErrorMessage(error, "Failed to add SKU"));
+    }
+  };
+
+  const handleEditAddBarcode = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedItemId) return;
+
+    const trimmedBarcode = newEditBarcode.trim();
+    setEditBarcodeError(null);
+
+    if (!trimmedBarcode) {
+      setEditBarcodeError("Barcode is required");
+      return;
+    }
+
+    if (trimmedBarcode.length > 200) {
+      setEditBarcodeError("Barcode must be 200 characters or less");
+      return;
+    }
+
+    try {
+      await addBarcodeMutation.mutateAsync({ itemId: selectedItemId, barcode: trimmedBarcode });
+      setNewEditBarcode("");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setEditBarcodeError(getApiErrorMessage(error, "Barcode already exists"));
+        return;
+      }
+
+      if (error instanceof ApiError && error.status === 403) {
+        setEditBarcodeError("Only owners can add barcodes");
+        return;
+      }
+
+      setEditBarcodeError(getApiErrorMessage(error, "Failed to add barcode"));
+    }
+  };
+
   const selectedItem = itemQuery.data;
+
+  const isEditSaveEnabled =
+    !!selectedItem &&
+    (editName.trim() !== selectedItem.name ||
+      editDescription.trim() !== (selectedItem.description ?? ""));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -355,195 +507,8 @@ export function ProductsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          <section className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Create Product
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Owners can register products before stock arrives.
-                </p>
-              </div>
-            </div>
-
-            {!isOwner ? (
-              <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-800">
-                Product management is available to owners. You can still browse
-                and search products from the list.
-              </div>
-            ) : (
-              <form className="space-y-4" onSubmit={handleCreateItem}>
-                {formError && (
-                  <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
-                    {formError}
-                  </div>
-                )}
-
-                {formSuccess && (
-                  <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
-                    {formSuccess}
-                  </div>
-                )}
-
-                <div>
-                  <label
-                    htmlFor="product-name"
-                    className="block text-sm font-medium text-gray-700 mb-2"
-                  >
-                    Product Name
-                  </label>
-                  <input
-                    id="product-name"
-                    type="text"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    maxLength={200}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Protein powder, Tape roll, Cleaning spray"
-                    disabled={createItemMutation.isPending}
-                  />
-                  {nameError && (
-                    <p className="mt-2 text-sm text-red-600">{nameError}</p>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      SKUs
-                    </label>
-                    <button
-                      type="button"
-                      onClick={addSkuInput}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-700"
-                      disabled={createItemMutation.isPending}
-                    >
-                      Add SKU field
-                    </button>
-                  </div>
-
-                  {skuInputs.map((value, index) => (
-                    <div
-                      key={`${index}-${skuInputs.length}`}
-                      className="flex gap-3"
-                    >
-                      <input
-                        id={index === 0 ? "product-sku" : undefined}
-                        type="text"
-                        value={value}
-                        onChange={(event) =>
-                          handleSkuChange(index, event.target.value)
-                        }
-                        maxLength={100}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        placeholder="Optional SKU"
-                        disabled={createItemMutation.isPending}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeSkuInput(index)}
-                        className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                        disabled={createItemMutation.isPending}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-
-                  {skuError && (
-                    <p className="text-sm text-red-600">{skuError}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="product-description"
-                    className="block text-sm font-medium text-gray-700 mb-2"
-                  >
-                    Description
-                  </label>
-                  <textarea
-                    id="product-description"
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    maxLength={1000}
-                    rows={4}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Optional details for operators or purchasing"
-                    disabled={createItemMutation.isPending}
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Barcodes
-                    </label>
-                    <button
-                      type="button"
-                      onClick={addBarcodeInput}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-700"
-                      disabled={createItemMutation.isPending}
-                    >
-                      Add barcode field
-                    </button>
-                  </div>
-
-                  {barcodeInputs.map((value, index) => (
-                    <div
-                      key={`${index}-${barcodeInputs.length}`}
-                      className="flex gap-3"
-                    >
-                      <input
-                        type="text"
-                        value={value}
-                        onChange={(event) =>
-                          handleBarcodeChange(index, event.target.value)
-                        }
-                        maxLength={200}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        placeholder="Optional barcode"
-                        disabled={createItemMutation.isPending}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateBarcodeScanner(index)}
-                        className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                        disabled={createItemMutation.isPending}
-                      >
-                        📷
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeBarcodeInput(index)}
-                        className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                        disabled={createItemMutation.isPending}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-
-                  {barcodeError && (
-                    <p className="text-sm text-red-600">{barcodeError}</p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={createItemMutation.isPending}
-                >
-                  {createItemMutation.isPending
-                    ? "Creating..."
-                    : "Create Product"}
-                </button>
-              </form>
-            )}
-          </section>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Left column: list */}
           <section className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between gap-4 mb-4">
               <div>
@@ -554,6 +519,18 @@ export function ProductsPage() {
                   Search by product name, SKU, description, or barcode.
                 </p>
               </div>
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("create");
+                    setSelectedItemId(null);
+                  }}
+                  className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Create New
+                </button>
+              )}
             </div>
 
             <input
@@ -582,18 +559,17 @@ export function ProductsPage() {
                   const isSelected = item.id === selectedItemId;
 
                   return (
-                    <button
+                    <div
                       key={item.id}
-                      type="button"
-                      onClick={() => setSelectedItemId(item.id)}
-                      className={`w-full text-left rounded-lg border p-4 transition-colors ${
+                      className={`w-full text-left rounded-lg border p-4 transition-colors cursor-pointer ${
                         isSelected
                           ? "border-blue-500 bg-blue-50"
                           : "border-gray-200 hover:border-gray-300"
                       }`}
+                      onClick={() => setSelectedItemId(item.id)}
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-gray-900">
                             {item.name}
                           </h3>
@@ -608,184 +584,427 @@ export function ProductsPage() {
                             </p>
                           )}
                         </div>
-                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                          {item.barcode_count} barcode
-                          {item.barcode_count === 1 ? "" : "s"}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                            {item.barcode_count} barcode
+                            {item.barcode_count === 1 ? "" : "s"}
+                          </span>
+                          {isOwner && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedItemId(item.id);
+                                setMode("edit");
+                              }}
+                              className="inline-flex items-center rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <p className="mt-3 text-xs text-gray-500">
                         Created {new Date(item.created_at).toLocaleDateString()}
                       </p>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
             )}
           </section>
 
+          {/* Right column: context panel */}
           <section className="bg-white rounded-lg shadow p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Product Detail
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Review the barcode set operators will discover during stock
-                work.
-              </p>
-            </div>
-
-            {!selectedItemId ? (
-              <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-800">
-                Select a product to inspect its barcode set.
-              </div>
-            ) : itemQuery.isLoading ? (
-              <p className="text-sm text-gray-600">
-                Loading product details...
-              </p>
-            ) : itemQuery.isError ? (
-              <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
-                Failed to load product details.
-              </div>
-            ) : !selectedItem ? (
-              <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
-                Product not found.
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        {selectedItem.name}
-                      </h3>
-                      {selectedItem.skus.length > 0 && (
-                        <p className="mt-2 text-sm font-medium uppercase tracking-wide text-blue-700">
-                          {formatSkuSummary(selectedItem.skus)}
-                        </p>
-                      )}
-                      <p className="mt-2 text-sm text-gray-600">
-                        {selectedItem.description ||
-                          "No description recorded for this product."}
-                      </p>
-                    </div>
-                    <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
-                      {selectedItem.barcode_count} barcode
-                      {selectedItem.barcode_count === 1 ? "" : "s"}
-                    </span>
+            {mode === "create" ? (
+              <>
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      Create Product
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Owners can register products before stock arrives.
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setMode("view")}
+                    className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
                 </div>
 
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                    Registered SKUs
-                  </h4>
-                  {selectedItem.skus.length === 0 ? (
-                    <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
-                      This product has no SKUs yet.
+                <form className="space-y-4" onSubmit={handleCreateItem}>
+                  {formError && (
+                    <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+                      {formError}
                     </div>
-                  ) : (
-                    <ul className="space-y-2">
-                      {selectedItem.skus.map((sku) => (
-                        <li
-                          key={sku}
-                          className="rounded-md border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700"
-                        >
-                          {sku}
-                        </li>
-                      ))}
-                    </ul>
                   )}
-                </div>
 
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                    Registered Barcodes
-                  </h4>
-                  {selectedItem.barcodes.length === 0 ? (
-                    <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
-                      This product has no barcodes yet. Add one before using
-                      scan-first stock flows.
+                  {formSuccess && (
+                    <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
+                      {formSuccess}
                     </div>
-                  ) : (
-                    <ul className="space-y-2">
-                      {selectedItem.barcodes.map((barcode) => (
-                        <li
-                          key={barcode}
-                          className="rounded-md border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700"
-                        >
-                          {barcode}
-                        </li>
-                      ))}
-                    </ul>
                   )}
-                </div>
 
-                {isOwner && (
-                  <div className="space-y-6">
-                    <form className="space-y-3" onSubmit={handleAddSku}>
-                      <div className="flex items-center justify-between gap-4">
-                        <h4 className="text-sm font-semibold text-gray-900">
-                          Add SKU
-                        </h4>
-                      </div>
+                  <div>
+                    <label
+                      htmlFor="product-name"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
+                      Product Name
+                    </label>
+                    <input
+                      id="product-name"
+                      type="text"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      maxLength={200}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="Protein powder, Tape roll, Cleaning spray"
+                      disabled={createItemMutation.isPending}
+                    />
+                    {nameError && (
+                      <p className="mt-2 text-sm text-red-600">{nameError}</p>
+                    )}
+                  </div>
 
-                      {newSkuError && (
-                        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
-                          {newSkuError}
-                        </div>
-                      )}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        SKUs
+                      </label>
+                      <button
+                        type="button"
+                        onClick={addSkuInput}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                        disabled={createItemMutation.isPending}
+                      >
+                        Add SKU field
+                      </button>
+                    </div>
 
-                      {newSkuSuccess && (
-                        <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
-                          {newSkuSuccess}
-                        </div>
-                      )}
-
-                      <div className="flex gap-3">
+                    {skuInputs.map((value, index) => (
+                      <div
+                        key={`${index}-${skuInputs.length}`}
+                        className="flex gap-3"
+                      >
                         <input
+                          id={index === 0 ? "product-sku" : undefined}
                           type="text"
-                          value={newSku}
-                          onChange={(event) => setNewSku(event.target.value)}
+                          value={value}
+                          onChange={(event) =>
+                            handleSkuChange(index, event.target.value)
+                          }
                           maxLength={100}
                           className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                          placeholder="Enter a new SKU"
+                          placeholder="Optional SKU"
+                          disabled={createItemMutation.isPending}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeSkuInput(index)}
+                          className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                          disabled={createItemMutation.isPending}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+
+                    {skuError && (
+                      <p className="text-sm text-red-600">{skuError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="product-description"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
+                      Description
+                    </label>
+                    <textarea
+                      id="product-description"
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      maxLength={1000}
+                      rows={4}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="Optional details for operators or purchasing"
+                      disabled={createItemMutation.isPending}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Barcodes
+                      </label>
+                      <button
+                        type="button"
+                        onClick={addBarcodeInput}
+                        className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                        disabled={createItemMutation.isPending}
+                      >
+                        Add barcode field
+                      </button>
+                    </div>
+
+                    {barcodeInputs.map((value, index) => (
+                      <div
+                        key={`${index}-${barcodeInputs.length}`}
+                        className="flex gap-3"
+                      >
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(event) =>
+                            handleBarcodeChange(index, event.target.value)
+                          }
+                          maxLength={200}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          placeholder="Optional barcode"
+                          disabled={createItemMutation.isPending}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateBarcodeScanner(index)}
+                          className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                          disabled={createItemMutation.isPending}
+                        >
+                          📷
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeBarcodeInput(index)}
+                          className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                          disabled={createItemMutation.isPending}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+
+                    {barcodeError && (
+                      <p className="text-sm text-red-600">{barcodeError}</p>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={createItemMutation.isPending}
+                  >
+                    {createItemMutation.isPending
+                      ? "Creating..."
+                      : "Create Product"}
+                  </button>
+                </form>
+              </>
+            ) : mode === "edit" && selectedItemId ? (
+              <>
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      Edit Product
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Update product details, SKUs, and barcodes.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMode("view")}
+                    className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                {itemQuery.isLoading ? (
+                  <p className="text-sm text-gray-600">Loading product...</p>
+                ) : itemQuery.isError ? (
+                  <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+                    Failed to load product details.
+                  </div>
+                ) : !selectedItem ? (
+                  <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
+                    Product not found.
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <form onSubmit={handleUpdateItem} className="space-y-4">
+                      {editFormError && (
+                        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+                          {editFormError}
+                        </div>
+                      )}
+
+                      {updateItemMutation.isSuccess && (
+                        <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
+                          Product updated.
+                        </div>
+                      )}
+
+                      <div>
+                        <label
+                          htmlFor="edit-name"
+                          className="block text-sm font-medium text-gray-700 mb-2"
+                        >
+                          Product Name
+                        </label>
+                        <input
+                          id="edit-name"
+                          type="text"
+                          value={editName}
+                          onChange={(event) => setEditName(event.target.value)}
+                          maxLength={200}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          disabled={updateItemMutation.isPending}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="edit-description"
+                          className="block text-sm font-medium text-gray-700 mb-2"
+                        >
+                          Description
+                        </label>
+                        <textarea
+                          id="edit-description"
+                          value={editDescription}
+                          onChange={(event) =>
+                            setEditDescription(event.target.value)
+                          }
+                          maxLength={1000}
+                          rows={4}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          placeholder="Optional details for operators or purchasing"
+                          disabled={updateItemMutation.isPending}
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={
+                          updateItemMutation.isPending || !isEditSaveEnabled
+                        }
+                      >
+                        {updateItemMutation.isPending ? "Saving..." : "Save"}
+                      </button>
+                    </form>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        SKUs
+                      </h4>
+                      {selectedItem.skus.length === 0 ? (
+                        <p className="text-sm text-gray-500 mb-3">
+                          No SKUs yet.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2 mb-3">
+                          {selectedItem.skus.map((sku) => (
+                            <li
+                              key={sku}
+                              className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2"
+                            >
+                              <span className="text-sm font-mono text-gray-700">
+                                {sku}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removeSkuMutation.mutate({
+                                    itemId: selectedItemId,
+                                    sku,
+                                  })
+                                }
+                                className="ml-2 text-red-500 hover:text-red-700 text-xs font-medium"
+                                disabled={removeSkuMutation.isPending}
+                              >
+                                ×
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <form onSubmit={handleEditAddSku} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newEditSku}
+                          onChange={(event) =>
+                            setNewEditSku(event.target.value)
+                          }
+                          maxLength={100}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          placeholder="Add a new SKU"
                           disabled={addSkuMutation.isPending}
                         />
                         <button
                           type="submit"
-                          className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           disabled={addSkuMutation.isPending}
                         >
-                          {addSkuMutation.isPending ? "Saving..." : "Add"}
+                          Add
                         </button>
-                      </div>
-                    </form>
-
-                    <form className="space-y-3" onSubmit={handleAddBarcode}>
-                      <div className="flex items-center justify-between gap-4">
-                        <h4 className="text-sm font-semibold text-gray-900">
-                          Add Barcode
-                        </h4>
-                      </div>
-
-                      {newBarcodeError && (
-                        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
-                          {newBarcodeError}
-                        </div>
+                      </form>
+                      {editSkuError && (
+                        <p className="mt-2 text-sm text-red-600">
+                          {editSkuError}
+                        </p>
                       )}
+                    </div>
 
-                      {newBarcodeSuccess && (
-                        <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
-                          {newBarcodeSuccess}
-                        </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        Barcodes
+                      </h4>
+                      {selectedItem.barcodes.length === 0 ? (
+                        <p className="text-sm text-gray-500 mb-3">
+                          No barcodes yet.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2 mb-3">
+                          {selectedItem.barcodes.map((barcode) => (
+                            <li
+                              key={barcode}
+                              className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2"
+                            >
+                              <span className="text-sm font-mono text-gray-700">
+                                {barcode}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removeBarcodeMutation.mutate({
+                                    itemId: selectedItemId,
+                                    barcode,
+                                  })
+                                }
+                                className="ml-2 text-red-500 hover:text-red-700 text-xs font-medium"
+                                disabled={removeBarcodeMutation.isPending}
+                              >
+                                ×
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       )}
-
-                      <div className="flex gap-3">
+                      <form
+                        onSubmit={handleEditAddBarcode}
+                        className="flex gap-2"
+                      >
                         <input
                           type="text"
-                          value={newBarcode}
+                          value={newEditBarcode}
                           onChange={(event) =>
-                            setNewBarcode(event.target.value)
+                            setNewEditBarcode(event.target.value)
                           }
                           maxLength={200}
                           className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -794,34 +1013,141 @@ export function ProductsPage() {
                         />
                         <button
                           type="button"
-                          onClick={() => setShowAddBarcodeScanner(true)}
+                          onClick={() => setShowEditBarcodeScanner(true)}
                           className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >
                           📷
                         </button>
                         <button
                           type="submit"
-                          className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           disabled={addBarcodeMutation.isPending}
                         >
-                          {addBarcodeMutation.isPending ? "Saving..." : "Add"}
+                          Add
                         </button>
-                      </div>
-                    </form>
+                      </form>
+                      {editBarcodeError && (
+                        <p className="mt-2 text-sm text-red-600">
+                          {editBarcodeError}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
-              </div>
+              </>
+            ) : (
+              /* view mode */
+              <>
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    Product Detail
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Review the barcode set operators will discover during stock
+                    work.
+                  </p>
+                </div>
+
+                {!selectedItemId ? (
+                  <div className="rounded-md bg-blue-50 p-4 text-sm text-blue-800">
+                    Select a product to inspect its barcode set.
+                  </div>
+                ) : itemQuery.isLoading ? (
+                  <p className="text-sm text-gray-600">
+                    Loading product details...
+                  </p>
+                ) : itemQuery.isError ? (
+                  <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+                    Failed to load product details.
+                  </div>
+                ) : !selectedItem ? (
+                  <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
+                    Product not found.
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div>
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="text-2xl font-bold text-gray-900">
+                            {selectedItem.name}
+                          </h3>
+                          {selectedItem.skus.length > 0 && (
+                            <p className="mt-2 text-sm font-medium uppercase tracking-wide text-blue-700">
+                              {formatSkuSummary(selectedItem.skus)}
+                            </p>
+                          )}
+                          <p className="mt-2 text-sm text-gray-600">
+                            {selectedItem.description ||
+                              "No description recorded for this product."}
+                          </p>
+                        </div>
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
+                          {selectedItem.barcode_count} barcode
+                          {selectedItem.barcode_count === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        Registered SKUs
+                      </h4>
+                      {selectedItem.skus.length === 0 ? (
+                        <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
+                          This product has no SKUs yet.
+                        </div>
+                      ) : (
+                        <ul className="space-y-2">
+                          {selectedItem.skus.map((sku) => (
+                            <li
+                              key={sku}
+                              className="rounded-md border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700"
+                            >
+                              {sku}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                        Registered Barcodes
+                      </h4>
+                      {selectedItem.barcodes.length === 0 ? (
+                        <div className="rounded-md bg-yellow-50 p-4 text-sm text-yellow-800">
+                          This product has no barcodes yet. Add one before using
+                          scan-first stock flows.
+                        </div>
+                      ) : (
+                        <ul className="space-y-2">
+                          {selectedItem.barcodes.map((barcode) => (
+                            <li
+                              key={barcode}
+                              className="rounded-md border border-gray-200 px-3 py-2 text-sm font-mono text-gray-700"
+                            >
+                              {barcode}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
         </div>
       </div>
-      {showAddBarcodeScanner && (
+
+      {showEditBarcodeScanner && (
         <ScanOverlay
           onBarcodeScan={(value) => {
-            setNewBarcode(value);
-            setShowAddBarcodeScanner(false);
+            setNewEditBarcode(value);
+            setShowEditBarcodeScanner(false);
           }}
-          onClose={() => setShowAddBarcodeScanner(false)}
+          onClose={() => setShowEditBarcodeScanner(false)}
         />
       )}
       {showCreateBarcodeScanner !== null && (

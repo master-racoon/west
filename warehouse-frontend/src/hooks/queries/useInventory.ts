@@ -208,3 +208,67 @@ export function useRejectRemovalApproval() {
     },
   });
 }
+
+export interface BinBalanceItem {
+  bin_id: string;
+  bin_name: string;
+  quantity: number;
+}
+
+export interface WarehouseBalanceItem {
+  warehouse_id: string;
+  warehouse_name: string;
+  quantity: number;
+  bins: BinBalanceItem[];
+}
+
+export interface CurrentBalanceItem {
+  item_id: string;
+  item_name: string;
+  skus: string[];
+  total_quantity: number;
+  warehouses: WarehouseBalanceItem[];
+}
+
+export interface CurrentBalanceFilter {
+  warehouse_id?: string;
+  sku?: string;
+}
+
+export function useInventoryCurrentBalance(filters?: CurrentBalanceFilter) {
+  return useQuery<CurrentBalanceItem[]>({
+    queryKey: ["inventory", "current-balance", filters],
+    queryFn: () => client.inventory.currentBalance(filters),
+  });
+}
+
+export interface CreateManualMovementRequest {
+  item_id: string;
+  warehouse_id: string;
+  bin_id?: string;
+  quantity: number;
+  note?: string;
+}
+
+export interface CreateManualMovementResponse {
+  movement_id: string;
+  type: "MANUAL_ADJUSTMENT";
+  item_id: string;
+  warehouse_id: string;
+  bin_id?: string;
+  quantity: number;
+  note?: string;
+  created_at: string;
+}
+
+export function useCreateManualMovement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateManualMovementRequest) =>
+      client.inventory.createManualMovement(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory", "balance"] });
+    },
+  });
+}

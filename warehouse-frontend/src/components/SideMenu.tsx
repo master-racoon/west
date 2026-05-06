@@ -3,12 +3,16 @@ import { useAuthStore } from "../stores/authStore";
 
 const ownerNavItems = [
   { label: "Configuration", to: "/dashboard/configuration" },
+  { label: "Create Movement", to: "/dashboard/create-movement" },
+  { label: "Bulk Upload Products", to: "/dashboard/bulk-upload-products" },
+  { label: "Bulk Upload Balance", to: "/dashboard/bulk-upload-balance" },
 ];
 
 const navItems = [
   { label: "Products", to: "/dashboard/products" },
   { label: "Inventory", to: "/dashboard/inventory" },
   { label: "Inventory Visibility", to: "/dashboard/inventory-visibility" },
+  { label: "Current Balance", to: "/dashboard/current-balance" },
 ];
 
 function NavItem({ to, label }: { to: string; label: string }) {

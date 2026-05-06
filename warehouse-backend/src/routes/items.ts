@@ -1,5 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { eq, ilike, inArray, like, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, like, or, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../authorization/middleware";
 import {
   barcode,
@@ -49,6 +49,21 @@ export const AddSkuRequest = z.object({
 });
 
 export type AddSkuRequest = z.infer<typeof AddSkuRequest>;
+
+const UpdateItemRequest = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().max(1000).optional(),
+});
+
+const SkuValueParams = z.object({
+  id: z.string().uuid(),
+  sku: z.string().min(1).max(100),
+});
+
+const BarcodeValueParams = z.object({
+  id: z.string().uuid(),
+  barcode: z.string().min(1).max(200),
+});
 
 export const ItemResponse = z.object({
   id: z.string().uuid(),
@@ -405,6 +420,154 @@ const lookupBarcodeRoute = createRoute({
     },
     404: {
       description: "Barcode not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const deleteItemRoute = createRoute({
+  method: "delete",
+  path: "/{id}",
+  tags: ["Items"],
+  operationId: "deleteItem",
+  summary: "Delete an item",
+  request: {
+    params: ItemIdParams,
+  },
+  responses: {
+    204: {
+      description: "Item deleted",
+    },
+    403: {
+      description: "Owner role required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Item not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    409: {
+      description: "Item has movement history",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const updateItemRoute = createRoute({
+  method: "patch",
+  path: "/{id}",
+  tags: ["Items"],
+  operationId: "updateItem",
+  summary: "Update item name and/or description",
+  request: {
+    params: ItemIdParams,
+    body: {
+      content: {
+        "application/json": {
+          schema: UpdateItemRequest,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Updated item",
+      content: {
+        "application/json": {
+          schema: ItemResponse,
+        },
+      },
+    },
+    403: {
+      description: "Owner role required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Item not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const deleteSkuRoute = createRoute({
+  method: "delete",
+  path: "/{id}/skus/{sku}",
+  tags: ["Items"],
+  operationId: "deleteItemSku",
+  summary: "Remove a SKU from an item",
+  request: {
+    params: SkuValueParams,
+  },
+  responses: {
+    204: {
+      description: "SKU removed",
+    },
+    403: {
+      description: "Owner role required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Item or SKU not found",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const deleteBarcodeRoute = createRoute({
+  method: "delete",
+  path: "/{id}/barcodes/{barcode}",
+  tags: ["Items"],
+  operationId: "deleteItemBarcode",
+  summary: "Remove a barcode from an item",
+  request: {
+    params: BarcodeValueParams,
+  },
+  responses: {
+    204: {
+      description: "Barcode removed",
+    },
+    403: {
+      description: "Owner role required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+    404: {
+      description: "Item or barcode not found",
       content: {
         "application/json": {
           schema: ErrorResponse,
@@ -865,13 +1028,161 @@ itemsRouter.openapi(searchItemsRoute, async (c) => {
   );
 });
 
+itemsRouter.post("/bulk", async (c) => {
+  requireRole(c, "owner");
+
+  const db = c.get("db");
+
+  let formData: FormData;
+  try {
+    formData = await c.req.formData();
+  } catch {
+    return c.json({ error: "Invalid form data" }, 400);
+  }
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string") {
+    return c.json({ error: "file field is required" }, 400);
+  }
+
+  const fileEntry = file as { text(): Promise<string> };
+  const text = await fileEntry.text();
+  const lines = text.split(/\r?\n/);
+
+  if (lines.length === 0) {
+    return c.json({ created: 0, skipped: 0, errors: [] });
+  }
+
+  const header = lines[0].split(",").map((h: string) => h.trim().toLowerCase());
+  const nameIdx = header.indexOf("name");
+  const descIdx = header.indexOf("description");
+  const skuIdx = header.indexOf("sku");
+  const barcodeIdx = header.indexOf("barcode");
+
+  if (nameIdx === -1) {
+    return c.json({ error: "CSV must have a 'name' column" }, 400);
+  }
+
+  type CsvRow = {
+    rowNum: number;
+    name: string;
+    description?: string;
+    sku?: string;
+    barcode?: string;
+  };
+
+  const rows: CsvRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const cols = line.split(",").map((col: string) => col.trim());
+    const name = nameIdx < cols.length ? cols[nameIdx] : "";
+    if (!name) continue;
+
+    rows.push({
+      rowNum: i + 1,
+      name,
+      description:
+        descIdx >= 0 && descIdx < cols.length && cols[descIdx]
+          ? cols[descIdx]
+          : undefined,
+      sku:
+        skuIdx >= 0 && skuIdx < cols.length && cols[skuIdx]
+          ? cols[skuIdx]
+          : undefined,
+      barcode:
+        barcodeIdx >= 0 && barcodeIdx < cols.length && cols[barcodeIdx]
+          ? cols[barcodeIdx]
+          : undefined,
+    });
+  }
+
+  const groups = new Map<string, CsvRow[]>();
+  for (const row of rows) {
+    const key = row.name.toLowerCase();
+    const group = groups.get(key) || [];
+    group.push(row);
+    groups.set(key, group);
+  }
+
+  let created = 0;
+  let skipped = 0;
+  const errors: { row: number; reason: string }[] = [];
+
+  for (const [, groupRows] of groups) {
+    const itemName = groupRows[0].name;
+    const itemDescription = groupRows[0].description;
+
+    const existing = await db
+      .select({ id: item.id })
+      .from(item)
+      .where(ilike(item.name, itemName))
+      .limit(1);
+
+    let itemId: string;
+
+    if (existing.length > 0) {
+      itemId = existing[0].id;
+      skipped++;
+    } else {
+      const inserted = await db
+        .insert(item)
+        .values({
+          name: itemName,
+          description: normalizeDescription(itemDescription),
+        })
+        .returning({ id: item.id });
+
+      itemId = inserted[0].id;
+      created++;
+    }
+
+    for (const row of groupRows) {
+      if (row.sku) {
+        const skuValue = row.sku;
+        const existingSku = await db
+          .select({ id: itemSku.id })
+          .from(itemSku)
+          .where(eq(itemSku.sku, skuValue))
+          .limit(1);
+
+        if (existingSku.length > 0) {
+          errors.push({ row: row.rowNum, reason: "SKU already exists" });
+        } else {
+          await db.insert(itemSku).values({ item_id: itemId, sku: skuValue });
+        }
+      }
+
+      if (row.barcode) {
+        const barcodeValue = row.barcode;
+        const existingBarcode = await db
+          .select({ id: barcode.id })
+          .from(barcode)
+          .where(eq(barcode.barcode, barcodeValue))
+          .limit(1);
+
+        if (existingBarcode.length > 0) {
+          errors.push({ row: row.rowNum, reason: "Barcode already exists" });
+        } else {
+          await db
+            .insert(barcode)
+            .values({ item_id: itemId, barcode: barcodeValue });
+        }
+      }
+    }
+  }
+
+  return c.json({ created, skipped, errors }, 200);
+});
+
 itemsRouter.openapi(getItemRoute, async (c) => {
   requireAuth(c);
 
   const db = c.get("db");
   const { id } = c.req.valid("param");
 
-  return c.json(await getItemRecord(db, id));
+  return c.json(await getItemRecord(db, id), 200);
 });
 
 itemsRouter.openapi(addBarcodeRoute, async (c) => {
@@ -890,7 +1201,7 @@ itemsRouter.openapi(addBarcodeRoute, async (c) => {
     barcode: value,
   });
 
-  return c.json(await getItemRecord(db, id));
+  return c.json(await getItemRecord(db, id), 200);
 });
 
 itemsRouter.openapi(addSkuRoute, async (c) => {
@@ -910,7 +1221,133 @@ itemsRouter.openapi(addSkuRoute, async (c) => {
     sku: value,
   });
 
-  return c.json(await getItemRecord(db, id));
+  return c.json(await getItemRecord(db, id), 200);
+});
+
+itemsRouter.openapi(deleteItemRoute, async (c) => {
+  requireRole(c, "owner");
+
+  const db = c.get("db");
+  const { id } = c.req.valid("param");
+
+  const items = await db
+    .select({ id: item.id })
+    .from(item)
+    .where(eq(item.id, id))
+    .limit(1);
+
+  if (items.length === 0) {
+    throw new NotFoundError("Item not found");
+  }
+
+  const movements = await db
+    .select({ id: movement.id })
+    .from(movement)
+    .where(eq(movement.item_id, id))
+    .limit(1);
+
+  if (movements.length > 0) {
+    throw new ConflictError("Item has movement history and cannot be deleted");
+  }
+
+  await db.delete(item).where(eq(item.id, id));
+
+  return c.body(null, 204);
+});
+
+itemsRouter.openapi(updateItemRoute, async (c) => {
+  requireRole(c, "owner");
+
+  const db = c.get("db");
+  const { id } = c.req.valid("param");
+  const data = c.req.valid("json");
+
+  const items = await db
+    .select({ id: item.id })
+    .from(item)
+    .where(eq(item.id, id))
+    .limit(1);
+
+  if (items.length === 0) {
+    throw new NotFoundError("Item not found");
+  }
+
+  if (data.name !== undefined || data.description !== undefined) {
+    await db
+      .update(item)
+      .set({
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.description !== undefined
+          ? { description: normalizeDescription(data.description) }
+          : {}),
+        updated_at: new Date(),
+      })
+      .where(eq(item.id, id));
+  }
+
+  return c.json(await getItemRecord(db, id), 200);
+});
+
+itemsRouter.openapi(deleteSkuRoute, async (c) => {
+  requireRole(c, "owner");
+
+  const db = c.get("db");
+  const { id, sku } = c.req.valid("param");
+
+  const items = await db
+    .select({ id: item.id })
+    .from(item)
+    .where(eq(item.id, id))
+    .limit(1);
+
+  if (items.length === 0) {
+    throw new NotFoundError("Item not found");
+  }
+
+  const skuRecords = await db
+    .select({ id: itemSku.id })
+    .from(itemSku)
+    .where(and(eq(itemSku.item_id, id), eq(itemSku.sku, sku)))
+    .limit(1);
+
+  if (skuRecords.length === 0) {
+    throw new NotFoundError("SKU not found");
+  }
+
+  await db.delete(itemSku).where(eq(itemSku.id, skuRecords[0].id));
+
+  return c.body(null, 204);
+});
+
+itemsRouter.openapi(deleteBarcodeRoute, async (c) => {
+  requireRole(c, "owner");
+
+  const db = c.get("db");
+  const { id, barcode: barcodeValue } = c.req.valid("param");
+
+  const items = await db
+    .select({ id: item.id })
+    .from(item)
+    .where(eq(item.id, id))
+    .limit(1);
+
+  if (items.length === 0) {
+    throw new NotFoundError("Item not found");
+  }
+
+  const barcodeRecords = await db
+    .select({ id: barcode.id })
+    .from(barcode)
+    .where(and(eq(barcode.item_id, id), eq(barcode.barcode, barcodeValue)))
+    .limit(1);
+
+  if (barcodeRecords.length === 0) {
+    throw new NotFoundError("Barcode not found");
+  }
+
+  await db.delete(barcode).where(eq(barcode.id, barcodeRecords[0].id));
+
+  return c.body(null, 204);
 });
 
 function serializeTimestamp(value: unknown): string {

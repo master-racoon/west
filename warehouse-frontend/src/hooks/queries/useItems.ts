@@ -86,6 +86,83 @@ export function useAddSku() {
   });
 }
 
+export function useDeleteItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (itemId: string) => client.items.deleteItem(itemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+    },
+  });
+}
+
+export function useUpdateItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      name?: string;
+      description?: string;
+    }) => client.items.updateItem(id, data),
+    onSuccess: (_result, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["items", id] });
+    },
+  });
+}
+
+export function useAddItemSku() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ itemId, sku }: { itemId: string; sku: string }) =>
+      client.items.addItemSku(itemId, sku),
+    onSuccess: (_result, { itemId }) => {
+      queryClient.invalidateQueries({ queryKey: ["items", itemId] });
+    },
+  });
+}
+
+export function useRemoveItemSku() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ itemId, sku }: { itemId: string; sku: string }) =>
+      client.items.removeItemSku(itemId, sku),
+    onSuccess: (_result, { itemId }) => {
+      queryClient.invalidateQueries({ queryKey: ["items", itemId] });
+    },
+  });
+}
+
+export function useAddItemBarcode() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ itemId, barcode }: { itemId: string; barcode: string }) =>
+      client.items.addItemBarcode(itemId, barcode),
+    onSuccess: (_result, { itemId }) => {
+      queryClient.invalidateQueries({ queryKey: ["items", itemId] });
+    },
+  });
+}
+
+export function useRemoveItemBarcode() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ itemId, barcode }: { itemId: string; barcode: string }) =>
+      client.items.removeItemBarcode(itemId, barcode),
+    onSuccess: (_result, { itemId }) => {
+      queryClient.invalidateQueries({ queryKey: ["items", itemId] });
+    },
+  });
+}
+
 export interface ItemBalance {
   item_id: string;
   item_name: string;

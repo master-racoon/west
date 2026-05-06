@@ -1,6 +1,8 @@
 import { ApiError, WarehouseClient } from "../generated-api";
 import { useAuthStore } from "../stores/authStore";
 
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     const bodyError =
@@ -153,6 +155,34 @@ export const client = {
           itemId: filters?.item_id,
         }),
       ),
+    currentBalance: async (filters?: {
+      warehouse_id?: string;
+      sku?: string;
+    }): Promise<any> => {
+      const qs = new URLSearchParams();
+      if (filters?.warehouse_id) qs.set("warehouse_id", filters.warehouse_id);
+      if (filters?.sku) qs.set("sku", filters.sku);
+      const query = qs.toString();
+      const url = `${API_BASE}/api/inventory/current-balance${query ? `?${query}` : ""}`;
+      const token = localStorage.getItem("session_token");
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.status === 401) {
+        localStorage.removeItem("session_token");
+        useAuthStore.getState().clearUser();
+        window.location.replace("/login");
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw Object.assign(new Error(body.error || "Request failed"), {
+          status: res.status,
+          body,
+        });
+      }
+      return res.json();
+    },
     getRemovalApprovals: () =>
       withAuthHandling(apiClient.inventory.getRemovalApprovals()),
     approveRemovalApproval: (approvalId: string) =>
@@ -163,6 +193,46 @@ export const client = {
       withAuthHandling(
         apiClient.inventory.rejectRemovalApproval({ id: approvalId }),
       ),
+    createManualMovement: async (data: {
+      item_id: string;
+      warehouse_id: string;
+      bin_id?: string;
+      quantity: number;
+      note?: string;
+    }): Promise<{
+      movement_id: string;
+      type: "MANUAL_ADJUSTMENT";
+      item_id: string;
+      warehouse_id: string;
+      bin_id?: string;
+      quantity: number;
+      note?: string;
+      created_at: string;
+    }> => {
+      const token = localStorage.getItem("session_token");
+      const res = await fetch(`${API_BASE}/api/inventory/movements`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      if (res.status === 401) {
+        localStorage.removeItem("session_token");
+        useAuthStore.getState().clearUser();
+        window.location.replace("/login");
+        return null as any;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw Object.assign(new Error(body.error || "Request failed"), {
+          status: res.status,
+          body,
+        });
+      }
+      return res.json();
+    },
   },
   items: {
     getItems: () => withAuthHandling(apiClient.items.getItems()),
@@ -190,6 +260,111 @@ export const client = {
       withAuthHandling(
         apiClient.items.getItemMovements({ id: itemId, limit, offset }),
       ),
+    deleteItem: async (itemId: string): Promise<void> => {
+      const token = localStorage.getItem("session_token");
+      const response = await fetch(`${API_BASE}/api/items/${itemId}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (response.status === 401) {
+        localStorage.removeItem("session_token");
+        useAuthStore.getState().clearUser();
+        window.location.replace("/login");
+        return;
+      }
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw Object.assign(new Error(body.error || "Delete failed"), {
+          status: response.status,
+          body,
+        });
+      }
+    },
+    updateItem: async (
+      itemId: string,
+      data: { name?: string; description?: string },
+    ): Promise<unknown> => {
+      const token = localStorage.getItem("session_token");
+      const response = await fetch(`${API_BASE}/api/items/${itemId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      if (response.status === 401) {
+        localStorage.removeItem("session_token");
+        useAuthStore.getState().clearUser();
+        window.location.replace("/login");
+        return;
+      }
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw Object.assign(new Error(body.error || "Update failed"), {
+          status: response.status,
+          body,
+        });
+      }
+      return response.json();
+    },
+    addItemSku: (itemId: string, sku: string) =>
+      withAuthHandling(
+        apiClient.items.addSku({ id: itemId, requestBody: { sku } }),
+      ),
+    removeItemSku: async (itemId: string, sku: string): Promise<void> => {
+      const token = localStorage.getItem("session_token");
+      const response = await fetch(
+        `${API_BASE}/api/items/${itemId}/skus/${encodeURIComponent(sku)}`,
+        {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      if (response.status === 401) {
+        localStorage.removeItem("session_token");
+        useAuthStore.getState().clearUser();
+        window.location.replace("/login");
+        return;
+      }
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw Object.assign(new Error(body.error || "Remove SKU failed"), {
+          status: response.status,
+          body,
+        });
+      }
+    },
+    addItemBarcode: (itemId: string, barcode: string) =>
+      withAuthHandling(
+        apiClient.items.addBarcode({ id: itemId, requestBody: { barcode } }),
+      ),
+    removeItemBarcode: async (
+      itemId: string,
+      barcode: string,
+    ): Promise<void> => {
+      const token = localStorage.getItem("session_token");
+      const response = await fetch(
+        `${API_BASE}/api/items/${itemId}/barcodes/${encodeURIComponent(barcode)}`,
+        {
+          method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      if (response.status === 401) {
+        localStorage.removeItem("session_token");
+        useAuthStore.getState().clearUser();
+        window.location.replace("/login");
+        return;
+      }
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw Object.assign(new Error(body.error || "Remove barcode failed"), {
+          status: response.status,
+          body,
+        });
+      }
+    },
   },
   barcodes: {
     lookupItemByBarcode: (barcode: string) =>
@@ -197,15 +372,67 @@ export const client = {
   },
 };
 
-export interface ResolvedItemReference {
+export async function bulkUploadBalance(file: File): Promise<{
+  processed: number;
+  skipped: number;
+  errors: { row: number; reason: string }[];
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE}/api/inventory/bulk-balance`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  if (response.status === 401) {
+    localStorage.removeItem("session_token");
+    useAuthStore.getState().clearUser();
+    window.location.replace("/login");
+    throw new Error("Unauthorized");
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `Upload failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function bulkUploadProducts(file: File): Promise<{
+  created: number;
+  skipped: number;
+  errors: { row: number; reason: string }[];
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${API_BASE}/api/items/bulk`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  if (response.status === 401) {
+    localStorage.removeItem("session_token");
+    useAuthStore.getState().clearUser();
+    window.location.replace("/login");
+    throw new Error("Unauthorized");
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `Upload failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+export interface ResolvedItem {
   id: string;
   name: string;
-  skus: string[];
+  sku: string | null;
 }
 
 export async function resolveItemReference(
   identifier: string,
-): Promise<ResolvedItemReference> {
+): Promise<ResolvedItem> {
   const trimmed = identifier.trim();
 
   try {
@@ -215,7 +442,7 @@ export async function resolveItemReference(
     return {
       id: item.id,
       name: item.name,
-      skus: item.skus,
+      sku: item.skus[0] ?? null,
     };
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 404) {
@@ -231,7 +458,7 @@ export async function resolveItemReference(
     return {
       id: item.id,
       name: item.name,
-      skus: item.skus,
+      sku: item.skus[0] ?? null,
     };
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 404) {
@@ -250,7 +477,7 @@ export async function resolveItemReference(
     return {
       id: exactSkuMatch.id,
       name: exactSkuMatch.name,
-      skus: exactSkuMatch.skus,
+      sku: exactSkuMatch.skus[0] ?? null,
     };
   }
 

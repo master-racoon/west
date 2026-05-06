@@ -1,5 +1,5 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ilike, sql } from "drizzle-orm";
 import { requireAuth } from "../authorization/middleware";
 import {
   barcode,
@@ -100,6 +100,30 @@ export const CountAdjustResponse = z.object({
   movement_type: z.literal("COUNT_ADJUSTMENT"),
 });
 
+export const CreateManualMovementRequest = z.object({
+  item_id: z.string().uuid(),
+  warehouse_id: z.string().uuid(),
+  bin_id: z.string().uuid().optional(),
+  quantity: z
+    .number()
+    .int()
+    .refine((n) => n !== 0, {
+      message: "Quantity must be non-zero",
+    }),
+  note: z.string().max(500).optional(),
+});
+
+export const CreateManualMovementResponse = z.object({
+  movement_id: z.string().uuid(),
+  type: z.literal("MANUAL_ADJUSTMENT"),
+  item_id: z.string().uuid(),
+  warehouse_id: z.string().uuid(),
+  bin_id: z.string().uuid().optional(),
+  quantity: z.number().int(),
+  note: z.string().optional(),
+  created_at: z.string().datetime(),
+});
+
 export const RemoveStockWarningResponse = z.object({
   success: z.literal(false),
   warning: z.string(),
@@ -158,6 +182,34 @@ const InventoryBalanceRow = z.object({
 });
 
 const InventoryBalanceResponse = z.array(InventoryBalanceRow);
+
+const CurrentBalanceQuery = z.object({
+  warehouse_id: z.string().uuid().optional(),
+  sku: z.string().optional(),
+});
+
+const BinBalanceItem = z.object({
+  bin_id: z.string().uuid(),
+  bin_name: z.string(),
+  quantity: z.number().int(),
+});
+
+const WarehouseBalanceItem = z.object({
+  warehouse_id: z.string().uuid(),
+  warehouse_name: z.string(),
+  quantity: z.number().int(),
+  bins: z.array(BinBalanceItem),
+});
+
+const CurrentBalanceRecord = z.object({
+  item_id: z.string().uuid(),
+  item_name: z.string(),
+  skus: z.array(z.string()),
+  total_quantity: z.number().int(),
+  warehouses: z.array(WarehouseBalanceItem),
+});
+
+const CurrentBalanceResponse = z.array(CurrentBalanceRecord);
 
 const addStockRoute = createRoute({
   method: "post",
@@ -411,6 +463,49 @@ const countAdjustRoute = createRoute({
   },
 });
 
+const createManualMovementRoute = createRoute({
+  method: "post",
+  path: "/movements",
+  tags: ["Inventory"],
+  operationId: "createManualMovement",
+  summary: "Create a manual adjustment movement (owner only)",
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: CreateManualMovementRequest,
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      description: "Manual adjustment movement created",
+      content: {
+        "application/json": {
+          schema: CreateManualMovementResponse,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request",
+      content: { "application/json": { schema: ErrorResponse } },
+    },
+    401: {
+      description: "Authentication required",
+      content: { "application/json": { schema: ErrorResponse } },
+    },
+    403: {
+      description: "Owner role required",
+      content: { "application/json": { schema: ErrorResponse } },
+    },
+    404: {
+      description: "Resource not found",
+      content: { "application/json": { schema: ErrorResponse } },
+    },
+  },
+});
+
 const getBalanceRoute = createRoute({
   method: "get",
   path: "/balance",
@@ -426,6 +521,35 @@ const getBalanceRoute = createRoute({
       content: {
         "application/json": {
           schema: InventoryBalanceResponse,
+        },
+      },
+    },
+    401: {
+      description: "Authentication required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
+const getCurrentBalanceRoute = createRoute({
+  method: "get",
+  path: "/current-balance",
+  tags: ["Inventory"],
+  operationId: "getCurrentBalance",
+  summary: "Get current stock levels per item grouped by warehouse and bin",
+  request: {
+    query: CurrentBalanceQuery,
+  },
+  responses: {
+    200: {
+      description: "Current stock levels per item",
+      content: {
+        "application/json": {
+          schema: CurrentBalanceResponse,
         },
       },
     },
@@ -823,6 +947,42 @@ async function getBalanceAfter(
 ) {
   const rows = await getBalanceRows(db, filters);
   return rows[0]?.quantity ?? 0;
+}
+
+async function getPointBalance(
+  db: any,
+  params: { item_id: string; warehouse_id: string; bin_id?: string },
+): Promise<number> {
+  const binFilter = params.bin_id
+    ? sql`AND inventory_balance.bin_id = ${params.bin_id}`
+    : sql`AND inventory_balance.bin_id IS NULL`;
+
+  const result = await db.execute(sql`
+    SELECT COALESCE(SUM(inventory_balance.quantity), 0)::int AS quantity
+    FROM (
+      SELECT
+        ${movement.dest_warehouse_id} AS warehouse_id,
+        ${movement.dest_bin_id} AS bin_id,
+        ${movement.item_id} AS item_id,
+        ${movement.quantity} AS quantity
+      FROM ${movement}
+      WHERE ${movement.dest_warehouse_id} IS NOT NULL
+      UNION ALL
+      SELECT
+        ${movement.source_warehouse_id} AS warehouse_id,
+        ${movement.source_bin_id} AS bin_id,
+        ${movement.item_id} AS item_id,
+        (${movement.quantity} * -1) AS quantity
+      FROM ${movement}
+      WHERE ${movement.source_warehouse_id} IS NOT NULL
+    ) AS inventory_balance
+    WHERE inventory_balance.warehouse_id = ${params.warehouse_id}
+      AND inventory_balance.item_id = ${params.item_id}
+      ${binFilter}
+  `);
+
+  const rows = Array.isArray(result) ? result : (result.rows ?? []);
+  return Number(rows[0]?.quantity ?? 0);
 }
 
 function getInventoryLockScope(warehouseId: string, binId?: string) {
@@ -1455,6 +1615,76 @@ inventoryRouter.openapi(countAdjustRoute, async (c) => {
   );
 });
 
+inventoryRouter.openapi(createManualMovementRoute, async (c) => {
+  const auth = requireAuth(c);
+
+  if (auth.role !== "owner") {
+    throw new ForbiddenError("Owner role required");
+  }
+
+  const db = c.get("db");
+  const data = c.req.valid("json");
+
+  const warehouseRecord = await getWarehouseRecord(db, data.warehouse_id);
+  await getItemRecord(db, data.item_id);
+
+  if (warehouseRecord.use_bins && !data.bin_id) {
+    throw new BadRequestError("Bin required for this warehouse");
+  }
+
+  if (!warehouseRecord.use_bins && data.bin_id) {
+    throw new BadRequestError("Bins are not enabled for this warehouse");
+  }
+
+  if (data.bin_id) {
+    await getBinRecord(db, warehouseRecord.id, data.bin_id);
+  }
+
+  const isPositive = data.quantity > 0;
+  const absQuantity = Math.abs(data.quantity);
+
+  const created = await db
+    .insert(movement)
+    .values({
+      type: "MANUAL_ADJUSTMENT",
+      user_id: auth.id,
+      item_id: data.item_id,
+      ...(isPositive
+        ? {
+            dest_warehouse_id: warehouseRecord.id,
+            ...(data.bin_id ? { dest_bin_id: data.bin_id } : {}),
+          }
+        : {
+            source_warehouse_id: warehouseRecord.id,
+            ...(data.bin_id ? { source_bin_id: data.bin_id } : {}),
+          }),
+      quantity: absQuantity,
+      ...(data.note ? { note: data.note } : {}),
+    })
+    .returning({
+      id: movement.id,
+      created_at: movement.created_at,
+    });
+
+  if (!created.length) {
+    throw new Error("Failed to create movement");
+  }
+
+  return c.json(
+    {
+      movement_id: created[0].id,
+      type: "MANUAL_ADJUSTMENT" as const,
+      item_id: data.item_id,
+      warehouse_id: warehouseRecord.id,
+      ...(data.bin_id ? { bin_id: data.bin_id } : {}),
+      quantity: data.quantity,
+      ...(data.note ? { note: data.note } : {}),
+      created_at: serializeTimestamp(created[0].created_at),
+    },
+    201,
+  );
+});
+
 inventoryRouter.openapi(getBalanceRoute, async (c) => {
   requireAuth(c);
 
@@ -1463,6 +1693,162 @@ inventoryRouter.openapi(getBalanceRoute, async (c) => {
   const rows = await getBalanceRows(db, filters);
 
   return c.json(rows, 200);
+});
+
+inventoryRouter.openapi(getCurrentBalanceRoute, async (c) => {
+  requireAuth(c);
+
+  const db = c.get("db");
+  const { warehouse_id, sku } = c.req.valid("query");
+
+  const whereClauses = [];
+
+  if (warehouse_id) {
+    whereClauses.push(sql`bal.warehouse_id = ${warehouse_id}::uuid`);
+  }
+
+  if (sku) {
+    whereClauses.push(
+      sql`i.id IN (SELECT item_id FROM item_sku WHERE sku ILIKE ${sku})`,
+    );
+  }
+
+  const whereSql = whereClauses.length
+    ? sql`AND ${sql.join(whereClauses, sql` AND `)}`
+    : sql``;
+
+  const result = await db.execute(sql`
+    WITH balance AS (
+      SELECT
+        warehouse_id,
+        bin_id,
+        item_id,
+        SUM(quantity)::int AS quantity
+      FROM (
+        SELECT
+          ${movement.dest_warehouse_id} AS warehouse_id,
+          ${movement.dest_bin_id} AS bin_id,
+          ${movement.item_id} AS item_id,
+          ${movement.quantity} AS quantity
+        FROM ${movement}
+        WHERE ${movement.dest_warehouse_id} IS NOT NULL
+        UNION ALL
+        SELECT
+          ${movement.source_warehouse_id} AS warehouse_id,
+          ${movement.source_bin_id} AS bin_id,
+          ${movement.item_id} AS item_id,
+          (${movement.quantity} * -1) AS quantity
+        FROM ${movement}
+        WHERE ${movement.source_warehouse_id} IS NOT NULL
+      ) mv
+      GROUP BY warehouse_id, bin_id, item_id
+    )
+    SELECT
+      i.id AS item_id,
+      i.name AS item_name,
+      bal.warehouse_id,
+      w.name AS warehouse_name,
+      bal.bin_id,
+      bn.name AS bin_name,
+      bal.quantity
+    FROM balance bal
+    INNER JOIN ${item} i ON i.id = bal.item_id
+    INNER JOIN ${warehouse} w ON w.id = bal.warehouse_id
+    LEFT JOIN ${bin} bn ON bn.id = bal.bin_id
+    WHERE 1=1 ${whereSql}
+    ORDER BY i.name, w.name, bn.name NULLS FIRST
+  `);
+
+  const rows = Array.isArray(result) ? result : (result.rows ?? []);
+
+  const itemIds = [...new Set(rows.map((r: any) => String(r.item_id)))];
+  const skusByItemId: Record<string, string[]> = {};
+
+  if (itemIds.length > 0) {
+    const skuResult = await db.execute(sql`
+      SELECT item_id::text, sku
+      FROM ${itemSku}
+      WHERE item_id = ANY(ARRAY[${sql.join(
+        itemIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )}])
+      ORDER BY sku
+    `);
+    const skuRows = Array.isArray(skuResult)
+      ? skuResult
+      : (skuResult.rows ?? []);
+    for (const row of skuRows) {
+      const id = String(row.item_id);
+      if (!skusByItemId[id]) skusByItemId[id] = [];
+      skusByItemId[id].push(String(row.sku));
+    }
+  }
+
+  const itemMap = new Map<
+    string,
+    {
+      item_id: string;
+      item_name: string;
+      total_quantity: number;
+      warehouses: Map<
+        string,
+        {
+          warehouse_id: string;
+          warehouse_name: string;
+          quantity: number;
+          bins: { bin_id: string; bin_name: string; quantity: number }[];
+        }
+      >;
+    }
+  >();
+
+  for (const row of rows) {
+    const itemId = String(row.item_id);
+    const warehouseId = String(row.warehouse_id);
+    const qty = Number(row.quantity);
+
+    if (!itemMap.has(itemId)) {
+      itemMap.set(itemId, {
+        item_id: itemId,
+        item_name: String(row.item_name),
+        total_quantity: 0,
+        warehouses: new Map(),
+      });
+    }
+
+    const itemEntry = itemMap.get(itemId)!;
+    itemEntry.total_quantity += qty;
+
+    if (!itemEntry.warehouses.has(warehouseId)) {
+      itemEntry.warehouses.set(warehouseId, {
+        warehouse_id: warehouseId,
+        warehouse_name: String(row.warehouse_name),
+        quantity: 0,
+        bins: [],
+      });
+    }
+
+    const warehouseEntry = itemEntry.warehouses.get(warehouseId)!;
+    warehouseEntry.quantity += qty;
+
+    if (row.bin_id) {
+      warehouseEntry.bins.push({
+        bin_id: String(row.bin_id),
+        bin_name: String(row.bin_name),
+        quantity: qty,
+      });
+    }
+  }
+
+  const response = Array.from(itemMap.values()).map((entry) => ({
+    item_id: entry.item_id,
+    item_name: entry.item_name,
+    skus: skusByItemId[entry.item_id] ?? [],
+    total_quantity: entry.total_quantity,
+    warehouses: Array.from(entry.warehouses.values()),
+  }));
+
+  return c.json(response, 200);
 });
 
 inventoryRouter.openapi(getRemovalApprovalsRoute, async (c) => {
@@ -1627,6 +2013,183 @@ inventoryRouter.openapi(rejectRemovalApprovalRoute, async (c) => {
     },
     200,
   );
+});
+
+inventoryRouter.post("/bulk-balance", async (c) => {
+  const auth = requireAuth(c);
+  if (auth.role !== "owner") {
+    throw new ForbiddenError("Owner role required");
+  }
+
+  const db = c.get("db");
+
+  let formData: FormData;
+  try {
+    formData = await c.req.formData();
+  } catch {
+    return c.json({ error: "Invalid form data" }, 400);
+  }
+
+  const file = formData.get("file");
+  if (!file || typeof file === "string") {
+    return c.json({ error: "file field is required" }, 400);
+  }
+
+  const fileEntry = file as { text(): Promise<string> };
+  const text = await fileEntry.text();
+  const lines = text.split(/\r?\n/);
+
+  if (lines.length === 0) {
+    return c.json({ processed: 0, skipped: 0, errors: [] });
+  }
+
+  const header = lines[0].split(",").map((h: string) => h.trim().toLowerCase());
+  const skuIdx = header.indexOf("sku");
+  const warehouseNameIdx = header.indexOf("warehouse_name");
+  const binNameIdx = header.indexOf("bin_name");
+  const quantityIdx = header.indexOf("quantity");
+
+  if (skuIdx === -1 || warehouseNameIdx === -1 || quantityIdx === -1) {
+    return c.json(
+      {
+        error: "CSV must have 'sku', 'warehouse_name', and 'quantity' columns",
+      },
+      400,
+    );
+  }
+
+  let processed = 0;
+  let skipped = 0;
+  const errors: { row: number; reason: string }[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const rowNum = i + 1;
+    const cols = line.split(",").map((col: string) => col.trim());
+    const skuValue = skuIdx < cols.length ? cols[skuIdx] : "";
+    const warehouseNameValue =
+      warehouseNameIdx < cols.length ? cols[warehouseNameIdx] : "";
+    const binNameValue =
+      binNameIdx >= 0 && binNameIdx < cols.length ? cols[binNameIdx] : "";
+    const quantityStr = quantityIdx < cols.length ? cols[quantityIdx] : "";
+
+    if (!skuValue) {
+      errors.push({ row: rowNum, reason: "sku is required" });
+      continue;
+    }
+
+    if (!warehouseNameValue) {
+      errors.push({ row: rowNum, reason: "warehouse_name is required" });
+      continue;
+    }
+
+    const targetQuantity = parseInt(quantityStr, 10);
+    if (isNaN(targetQuantity) || targetQuantity < 0) {
+      errors.push({
+        row: rowNum,
+        reason: "quantity must be a non-negative integer",
+      });
+      continue;
+    }
+
+    try {
+      const skuMatch = await db
+        .select({ item_id: itemSku.item_id })
+        .from(itemSku)
+        .where(eq(itemSku.sku, skuValue))
+        .limit(1);
+
+      if (!skuMatch.length) {
+        errors.push({
+          row: rowNum,
+          reason: `SKU '${skuValue}' not found`,
+        });
+        continue;
+      }
+      const itemId = String(skuMatch[0].item_id);
+
+      const warehouseMatch = await db
+        .select({ id: warehouse.id })
+        .from(warehouse)
+        .where(ilike(warehouse.name, warehouseNameValue))
+        .limit(1);
+
+      if (!warehouseMatch.length) {
+        errors.push({
+          row: rowNum,
+          reason: `Warehouse '${warehouseNameValue}' not found`,
+        });
+        continue;
+      }
+      const warehouseId = String(warehouseMatch[0].id);
+
+      let binId: string | undefined;
+      if (binNameValue) {
+        const binMatch = await db
+          .select({ id: bin.id })
+          .from(bin)
+          .where(
+            and(
+              eq(bin.warehouse_id, warehouseId),
+              ilike(bin.name, binNameValue),
+            ),
+          )
+          .limit(1);
+
+        if (!binMatch.length) {
+          errors.push({
+            row: rowNum,
+            reason: `Bin '${binNameValue}' not found in warehouse '${warehouseNameValue}'`,
+          });
+          continue;
+        }
+        binId = String(binMatch[0].id);
+      }
+
+      const currentBalance = await getPointBalance(db, {
+        item_id: itemId,
+        warehouse_id: warehouseId,
+        bin_id: binId,
+      });
+
+      const delta = targetQuantity - currentBalance;
+
+      if (delta === 0) {
+        skipped++;
+        continue;
+      }
+
+      const isPositiveDelta = delta > 0;
+      const absDelta = Math.abs(delta);
+
+      await db.insert(movement).values({
+        type: "COUNT_ADJUSTMENT",
+        user_id: auth.id,
+        item_id: itemId,
+        ...(isPositiveDelta
+          ? {
+              dest_warehouse_id: warehouseId,
+              ...(binId ? { dest_bin_id: binId } : {}),
+            }
+          : {
+              source_warehouse_id: warehouseId,
+              ...(binId ? { source_bin_id: binId } : {}),
+            }),
+        quantity: absDelta,
+      });
+
+      processed++;
+    } catch (err) {
+      errors.push({
+        row: rowNum,
+        reason: err instanceof Error ? err.message : "Unexpected error",
+      });
+    }
+  }
+
+  return c.json({ processed, skipped, errors });
 });
 
 export default inventoryRouter;

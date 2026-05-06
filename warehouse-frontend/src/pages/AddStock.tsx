@@ -2,14 +2,13 @@ import { FormEvent, KeyboardEvent, useMemo, useRef, useState } from "react";
 import { useBinsByWarehouse } from "../hooks/queries/useBins";
 import { useAddStock } from "../hooks/queries/useInventory";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
-import { ApiError, getApiErrorMessage, resolveItemReference } from "../lib/api";
+import {
+  ApiError,
+  getApiErrorMessage,
+  resolveItemReference,
+  ResolvedItem,
+} from "../lib/api";
 import { ScanOverlay } from "../components/ScanOverlay";
-
-interface ResolvedItem {
-  id: string;
-  name: string;
-  sku?: string;
-}
 
 interface AddStockPageProps {
   embedded?: boolean;

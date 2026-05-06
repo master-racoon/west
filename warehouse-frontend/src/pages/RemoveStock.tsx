@@ -8,15 +8,14 @@ import {
   useRemovalApprovals,
 } from "../hooks/queries/useInventory";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
-import { ApiError, getApiErrorMessage, resolveItemReference } from "../lib/api";
+import {
+  ApiError,
+  getApiErrorMessage,
+  resolveItemReference,
+  ResolvedItem,
+} from "../lib/api";
 import { useAuthStore } from "../stores/authStore";
 import { ScanOverlay } from "../components/ScanOverlay";
-
-interface ResolvedItem {
-  id: string;
-  name: string;
-  sku?: string;
-}
 
 interface RemoveStockPageProps {
   embedded?: boolean;

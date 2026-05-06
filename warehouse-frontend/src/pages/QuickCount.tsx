@@ -13,14 +13,13 @@ import {
   useInventoryBalance,
 } from "../hooks/queries/useInventory";
 import { useWarehouses } from "../hooks/queries/useWarehouses";
-import { ApiError, getApiErrorMessage, resolveItemReference } from "../lib/api";
+import {
+  ApiError,
+  getApiErrorMessage,
+  resolveItemReference,
+  ResolvedItem,
+} from "../lib/api";
 import { ScanOverlay } from "../components/ScanOverlay";
-
-interface ResolvedItem {
-  id: string;
-  name: string;
-  skus: string[];
-}
 
 function formatSkuSummary(skus: string[]) {
   if (skus.length === 0) {
@@ -223,7 +222,7 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
     setResolvedItem({
       id: selectedItem.id,
       name: selectedItem.name,
-      skus: selectedItem.skus,
+      sku: selectedItem.skus[0] ?? null,
     });
   };
 
@@ -524,7 +523,7 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
             <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-2">
               <p>
                 {resolvedItem
-                  ? `Resolved item: ${resolvedItem.name}${resolvedItem.skus.length > 0 ? ` (${formatSkuSummary(resolvedItem.skus)})` : ""}`
+                  ? `Resolved item: ${resolvedItem.name}${resolvedItem.sku ? ` (SKU: ${resolvedItem.sku})` : ""}`
                   : "Resolve a barcode, SKU, or item before recording a count."}
               </p>
               <p>

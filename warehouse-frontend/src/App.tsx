@@ -17,6 +17,10 @@ import { TransferStockPage } from "./pages/TransferStock";
 import { QuickCountPage } from "./pages/QuickCount";
 import { InventorySearchPage } from "./pages/InventorySearch";
 import { ItemDetailPage } from "./pages/ItemDetail";
+import { CurrentBalancePage } from "./pages/CurrentBalance";
+import { CreateMovementPage } from "./pages/CreateMovement";
+import { BulkUploadProductsPage } from "./pages/BulkUploadProducts";
+import { BulkUploadBalancePage } from "./pages/BulkUploadBalance";
 import { useAuthStore } from "./stores/authStore";
 
 function DashboardIndexRedirect() {
@@ -166,6 +170,16 @@ export function App() {
             <Route
               path="inventory-visibility/:id"
               element={<ItemDetailPage />}
+            />
+            <Route path="current-balance" element={<CurrentBalancePage />} />
+            <Route path="create-movement" element={<CreateMovementPage />} />
+            <Route
+              path="bulk-upload-products"
+              element={<BulkUploadProductsPage />}
+            />
+            <Route
+              path="bulk-upload-balance"
+              element={<BulkUploadBalancePage />}
             />
           </Route>
         </Route>
