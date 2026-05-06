@@ -435,7 +435,10 @@ export function ProductsPage() {
     }
 
     try {
-      await addSkuMutation.mutateAsync({ itemId: selectedItemId, sku: trimmedSku });
+      await addSkuMutation.mutateAsync({
+        itemId: selectedItemId,
+        sku: trimmedSku,
+      });
       setNewEditSku("");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
@@ -470,11 +473,16 @@ export function ProductsPage() {
     }
 
     try {
-      await addBarcodeMutation.mutateAsync({ itemId: selectedItemId, barcode: trimmedBarcode });
+      await addBarcodeMutation.mutateAsync({
+        itemId: selectedItemId,
+        barcode: trimmedBarcode,
+      });
       setNewEditBarcode("");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        setEditBarcodeError(getApiErrorMessage(error, "Barcode already exists"));
+        setEditBarcodeError(
+          getApiErrorMessage(error, "Barcode already exists"),
+        );
         return;
       }
 
