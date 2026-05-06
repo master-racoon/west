@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { ApiError, WarehouseClient } from "../generated-api";
 import { useAuthStore } from "../stores/authStore";
 
@@ -33,8 +34,11 @@ function handleUnauthorized(error: unknown): never {
 
 async function withAuthHandling<T>(request: Promise<T>): Promise<T> {
   try {
-    return await request;
+    const result = await request;
+    toast.success("Success");
+    return result;
   } catch (error) {
+    toast.error(getApiErrorMessage(error, "Request failed"));
     // On 401, first validate that session is actually expired
     if (error instanceof ApiError && error.status === 401) {
       try {

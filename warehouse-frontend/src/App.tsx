@@ -22,6 +22,7 @@ import { CreateMovementPage } from "./pages/CreateMovement";
 import { BulkUploadProductsPage } from "./pages/BulkUploadProducts";
 import { BulkUploadBalancePage } from "./pages/BulkUploadBalance";
 import { useAuthStore } from "./stores/authStore";
+import { Toaster } from "sonner";
 
 function DashboardIndexRedirect() {
   const { user } = useAuthStore();
@@ -134,56 +135,61 @@ function InventoryPage() {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route element={<ProtectedRouteGuard />}>
-          <Route path="/dashboard" element={<AppLayout />}>
-            <Route index element={<DashboardIndexRedirect />} />
-            <Route path="users" element={<UsersPage />} />
-            <Route path="configuration" element={<WarehouseCreate />} />
-            <Route path="products" element={<ProductsPage />} />
-            <Route
-              path="add"
-              element={<Navigate to="/dashboard/inventory/add" replace />}
-            />
-            <Route
-              path="remove"
-              element={<Navigate to="/dashboard/inventory/remove" replace />}
-            />
-            <Route
-              path="transfer"
-              element={<Navigate to="/dashboard/inventory/transfer" replace />}
-            />
-            <Route
-              path="quickcount"
-              element={
-                <Navigate to="/dashboard/inventory/quickcount" replace />
-              }
-            />
-            <Route path="inventory/*" element={<InventoryPage />} />
-            <Route
-              path="inventory-visibility"
-              element={<InventorySearchPage />}
-            />
-            <Route
-              path="inventory-visibility/:id"
-              element={<ItemDetailPage />}
-            />
-            <Route path="current-balance" element={<CurrentBalancePage />} />
-            <Route path="create-movement" element={<CreateMovementPage />} />
-            <Route
-              path="bulk-upload-products"
-              element={<BulkUploadProductsPage />}
-            />
-            <Route
-              path="bulk-upload-balance"
-              element={<BulkUploadBalancePage />}
-            />
+    <>
+      <Toaster richColors position="top-right" />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ProtectedRouteGuard />}>
+            <Route path="/dashboard" element={<AppLayout />}>
+              <Route index element={<DashboardIndexRedirect />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="configuration" element={<WarehouseCreate />} />
+              <Route path="products" element={<ProductsPage />} />
+              <Route
+                path="add"
+                element={<Navigate to="/dashboard/inventory/add" replace />}
+              />
+              <Route
+                path="remove"
+                element={<Navigate to="/dashboard/inventory/remove" replace />}
+              />
+              <Route
+                path="transfer"
+                element={
+                  <Navigate to="/dashboard/inventory/transfer" replace />
+                }
+              />
+              <Route
+                path="quickcount"
+                element={
+                  <Navigate to="/dashboard/inventory/quickcount" replace />
+                }
+              />
+              <Route path="inventory/*" element={<InventoryPage />} />
+              <Route
+                path="inventory-visibility"
+                element={<InventorySearchPage />}
+              />
+              <Route
+                path="inventory-visibility/:id"
+                element={<ItemDetailPage />}
+              />
+              <Route path="current-balance" element={<CurrentBalancePage />} />
+              <Route path="create-movement" element={<CreateMovementPage />} />
+              <Route
+                path="bulk-upload-products"
+                element={<BulkUploadProductsPage />}
+              />
+              <Route
+                path="bulk-upload-balance"
+                element={<BulkUploadBalancePage />}
+              />
+            </Route>
           </Route>
-        </Route>
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 }
