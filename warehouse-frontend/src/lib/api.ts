@@ -284,34 +284,13 @@ export const client = {
         });
       }
     },
-    updateItem: async (
+    updateItem: (
       itemId: string,
       data: { name?: string; description?: string },
-    ): Promise<unknown> => {
-      const token = localStorage.getItem("session_token");
-      const response = await fetch(`${API_BASE}/api/items/${itemId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(data),
-      });
-      if (response.status === 401) {
-        localStorage.removeItem("session_token");
-        useAuthStore.getState().clearUser();
-        window.location.replace("/login");
-        return;
-      }
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw Object.assign(new Error(body.error || "Update failed"), {
-          status: response.status,
-          body,
-        });
-      }
-      return response.json();
-    },
+    ) =>
+      withAuthHandling(
+        apiClient.items.updateItem({ id: itemId, requestBody: data }),
+      ),
     addItemSku: (itemId: string, sku: string) =>
       withAuthHandling(
         apiClient.items.addSku({ id: itemId, requestBody: { sku } }),
