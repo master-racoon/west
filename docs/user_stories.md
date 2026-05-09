@@ -1,352 +1,283 @@
 # User Stories — Warehouse Inventory System
 
-A barcode-driven inventory web app for a small family team to track items across warehouses. The system records every movement of stock, optionally tracks bins/shelves, and keeps the interface optimized for fast scanning workflows.
+A barcode-driven inventory web app for a small family team to track items across warehouses. The system records every movement of stock, can track exactly which shelf or bin something is in, and is designed to be fast to use with a barcode scanner.
 
-**DFD Reference**: See [docs/dfd_level0.md](dfd_level0.md) for data flows and boundary contracts.
-**Functional Requirements**: See [docs/functional_requirements.md](functional_requirements.md) for consolidated functional requirements.
-
----
-
-## Phase 0: Dependency Ordering
-
-The user stories are sorted by **implementation dependency first**, then **DFD flow sequence** for mutation flows:
-
-0. **App Shell & Access (Non-DFD Enabler)** — authenticated layout + side menu must exist before domain pages can be attached
-
-1. **Configuration Management** (`#flow-5-configuration`) — Owner must define warehouses, items, bins
-2. **Add Stock** (`#flow-1-add-stock`) — Receive inventory first
-3. **Remove Stock** (`#flow-2-remove-stock`) — Consume from existing inventory
-4. **Transfer Stock** (`#flow-3-transfer-stock`) — Move between locations
-5. **Quick Count** (`#flow-4-quick-count`) — Reconcile discrepancies
+**Technical reference**: See [docs/dfd_level0.md](dfd_level0.md) for system data flows and [docs/functional_requirements.md](functional_requirements.md) for consolidated functional requirements.
 
 ---
 
-## Platform Enablers (Non-DFD)
+## Story Groups
 
-These stories are intentionally **not represented as DFD mutation flows**. They provide frontend/auth scaffolding required for subsequent domain stories.
+Stories are ordered by how they depend on each other — you need to set up warehouses and items before you can move stock around.
 
-### US-0.1: Access Password-Protected App Shell with Domain Side Menu
+1. **Access & Login** — get into the app securely
+2. **Setup** — define warehouses, items, bins, and team members
+3. **Add Stock** — record items arriving at a warehouse
+4. **Remove Stock** — record items leaving a warehouse
+5. **Transfer Stock** — move items between warehouses
+6. **Quick Count** — correct inventory after a physical count
+7. **Inventory Visibility** — look up where things are and what happened to them
 
-**DFD Flow**: N/A (non-critical mutation flow; platform scaffold)
+---
 
-**Role**: Family User, Owner
+## Group 0: Access & Login
 
-**Story**: As a user, I want to access a password-protected application layout with a side menu listing all inventory domains, so future stories can plug into a consistent shell.
+### US-0.1: Sign In to the App
+
+**Who**: Everyone (Owner, Family User)
+
+**Story**: As a user, I want to sign in with a PIN so that only our team can access the inventory system.
 
 **Acceptance Criteria**:
 
-- Unauthenticated user is redirected to login when trying to access protected app routes
-- Authenticated user can access a protected layout wrapper
-- Protected layout includes a persistent side menu
-- Side menu contains domain entries as placeholders for upcoming stories:
-  - Configuration
-  - Add Stock
-  - Remove Stock
-  - Transfer Stock
-  - Quick Count
-  - Inventory Visibility
-- Selecting a side menu entry routes to corresponding domain page scaffold (can be placeholder states)
-- Logout action is available from protected layout
-
-**Boundary Contracts** (Auth endpoints only):
-
-- `POST /api/auth/login`
-  - Request: `{ password: string (min 8 chars) }`
-  - Response (success): `{ session_token: string, user: { id: UUID, role: 'owner' | 'user' } }`
-  - Response (error): `{ error: string }`
-- `POST /api/auth/logout`
-  - Request: `{}` (session from cookie/header)
-  - Response: `{ success: boolean }`
-- `GET /api/auth/session`
-  - Response (authenticated): `{ authenticated: true, user: { id: UUID, role: 'owner' | 'user' } }`
-  - Response (anonymous): `{ authenticated: false }`
-
-**Notes**:
-
-- This is a foundational UI/auth scaffold story and does not change inventory movement contracts.
-- Domain pages can initially be placeholders and are expanded by later user stories.
+- Anyone who is not signed in is taken to the login page automatically
+- Signed-in users see a layout with a side menu linking to every section of the app
+- The side menu includes: Setup, Add Stock, Remove Stock, Transfer Stock, Quick Count, and Inventory
+- Signing into a section takes you to the right page
+- A sign-out option is always visible
 
 ---
 
-## User Stories by DFD Flow
+## Group 1: Setup
 
-### Group 1: Configuration Management `#flow-5-configuration`
+### US-1.1: Create a Warehouse
 
-#### US-1.1: Define Warehouse with Bin Mode
+**Who**: Owner
 
-**DFD Flow**: [#flow-5-configuration](dfd_level0.md#flow-5-configuration)
-
-**Role**: Owner
-
-**Story**: As an owner, I want to define whether a warehouse uses bins or not, so the system matches how the space is organized.
+**Story**: As an owner, I want to create warehouses and decide whether they use storage bins, so the system matches how the physical space is organized.
 
 **Acceptance Criteria**:
 
-- Owner can create a warehouse with `name` and `use_bins` flag (boolean)
-- Data contract validation (from dfd_level0.md):
-  - `name`: required, string, 1-100 chars
-  - `use_bins`: boolean flag
-- When `use_bins = true`, bins become required for all inventory operations
-- When `use_bins = false`, inventory is stored at warehouse level only
-- Changes to `use_bins` persist in database
-
-**Related Data Entities** (from dfd_level0.md):
-
-- Warehouse aggregate: `id`, `name`, `use_bins`
+- Owner can create a warehouse with a name
+- Owner can choose whether the warehouse tracks items by bin/shelf or just by warehouse overall
+- If bins are enabled, all stock movements for that warehouse will require a bin to be selected
+- The warehouse appears in all relevant dropdowns across the app
 
 ---
 
-#### US-1.2: Create and Manage Items with Barcodes
+### US-1.2: Create and Manage Products
 
-**DFD Flow**: [#flow-5-configuration](dfd_level0.md#flow-5-configuration)
+**Who**: Owner
 
-**Role**: Owner
-
-**Story**: As an owner, I want to manage items and assign barcodes, so the system reflects the real inventory.
+**Story**: As an owner, I want to add products and assign barcodes to them, so the team can scan items rather than type them in manually.
 
 **Acceptance Criteria**:
 
-- Owner can create item with `name` and optional `description`
-- Owner can assign/update multiple barcodes to the same item (barcode canary pattern)
-- Data contract validation:
-  - `name`: required, string, 1-200 chars
-  - `description`: optional, string
-  - `barcode`: must be unique per item, alphanumeric
-- Item creation persists to database
-- Multiple barcodes map to single item
-
-**Related Data Entities**:
-
-- Item (SKU) aggregate: `id`, `name`, `description`, barcodes array
+- Owner can create a product with a name and an optional description
+- Owner can assign one or more barcodes to the same product
+- A barcode can only belong to one product
+- Products and barcodes can be updated after creation
 
 ---
 
-#### US-1.3: Create and Manage Bins (Conditional)
+### US-1.3: Bulk Import Products from a Spreadsheet
 
-**DFD Flow**: [#flow-5-configuration](dfd_level0.md#flow-5-configuration)
+**Who**: Owner
 
-**Role**: Owner
-
-**Story**: As an owner, I want to create bins/shelves in a warehouse, so I can organize storage locations.
+**Story**: As an owner, I want to upload a CSV file of products, so I can get started quickly without entering hundreds of items one by one.
 
 **Acceptance Criteria**:
 
-- Owner can create bins only if warehouse `use_bins = true`
-- Bin creation requires `warehouse_id` and `name`
-- Data contract validation:
-  - `name`: required, string, 1-100 chars
-- Bins appear in UI dropdowns during inventory operations
-
-**Related Data Entities**:
-
-- Bin aggregate: `id`, `warehouse_id`, `name`
+- Owner can download a template CSV showing the expected format
+- Owner uploads a filled-in CSV
+- The system imports valid rows and skips rows with errors
+- A summary shows how many rows were imported, skipped, and why any were skipped
 
 ---
 
-### Group 2: Add Stock (Receiving) `#flow-1-add-stock`
+### US-1.4: Create and Manage Bins
 
-#### US-2.1: Scan and Add Stock to Warehouse
+**Who**: Owner
 
-**DFD Flow**: [#flow-1-add-stock](dfd_level0.md#flow-1-add-stock)
-
-**Role**: Family User
-
-**Story**: As a user, I want to scan an item barcode, enter quantity, and add it to a warehouse, so inventory stays accurate when items arrive.
+**Story**: As an owner, I want to define the bins or shelves inside a warehouse, so the team can record exactly where stock is stored.
 
 **Acceptance Criteria**:
 
-- User selects warehouse
-- User scans barcode (or enters item ID manually)
-- System finds existing item or prompts to create
-- User enters quantity (int > 0)
-- If warehouse `use_bins = true`, user selects/creates bin
-- Confirm creates ADD movement and updates balance
-- Data contract (from dfd_level0.md):
-  - Request: `{ warehouse_id: UUID, barcode_or_item_id: string, quantity: int (>0), bin_id?: UUID }`
-  - Response: `{ movement_id: UUID, item_id: UUID, warehouse_id: UUID, bin_id?: UUID, quantity: int, balance_after: int }`
-
-**Related Data Entities**:
-
-- Movement: type=ADD, timestamp, user, item, warehouse, bin (optional), quantity
-- Inventory Balance: updated
+- Bins can only be added to a warehouse that has bins enabled
+- Each bin has a name (e.g. "Shelf A", "Row 3")
+- Bins appear as selectable options during stock operations
 
 ---
 
-#### US-2.2: Create Item On-the-Fly During Scan
+### US-1.5: Manage Team Members
 
-**DFD Flow**: [#flow-1-add-stock](dfd_level0.md#flow-1-add-stock)
+**Who**: Owner
 
-**Role**: Family User
-
-**Story**: As a user, I want to create a new item when scanning an unknown barcode, so onboarding new products is fast.
+**Story**: As an owner, I want to create accounts for family members with a PIN, so each person can sign in and I can see who made each change.
 
 **Acceptance Criteria**:
 
-- If scan matches no existing item, UI prompts for item details
-- User enters `name` (required), optional `description`
-- New barcode is appended to created item
-- Item is persisted; user can continue add-stock flow
-- Data contract:
-  - Request: `{ barcode: string, name: string (1-200), description?: string }`
-  - Response: `{ item_id: UUID, name, description?, barcode }`
+- Owner can create a new user with a name and a PIN
+- Owner can reset a user's PIN if they forget it
+- Owner can unlock an account that has been locked after too many wrong PIN attempts
+- Owner can remove a user from the system
+- Non-owners cannot access the user management page
 
 ---
 
-### Group 3: Remove Stock (Consumption) `#flow-2-remove-stock`
+## Group 2: Add Stock (Receiving)
 
-#### US-3.1: Scan and Remove Stock from Warehouse
+### US-2.1: Add Stock by Scanning a Barcode
 
-**DFD Flow**: [#flow-2-remove-stock](dfd_level0.md#flow-2-remove-stock)
+**Who**: Family User
 
-**Role**: Family User
-
-**Story**: As a user, I want to scan an item and remove quantity, so inventory reflects items sold or consumed.
+**Story**: As a user, I want to scan an item barcode and record how many arrived, so inventory is updated the moment stock comes in.
 
 **Acceptance Criteria**:
 
-- User selects warehouse
-- User scans item
-- User enters quantity to remove (int > 0)
-- If warehouse `use_bins = true`, user selects bin
-- System validates sufficient stock in (warehouse, bin?, item)
-- If insufficient stock detected, system warns user and notifies owner
-- If owner approves override, REMOVE movement is created with negative balance allowed
-- Otherwise, removal is blocked
-- Data contract (from dfd_level0.md):
-  - Request: `{ warehouse_id: UUID, item_id: UUID, quantity: int (>0), bin_id?: UUID, owner_override?: boolean }`
-  - Response (success): `{ movement_id: UUID, quantity_removed: int, balance_after: int }`
-  - Response (insufficient): `{ warning: string, owner_approval_required: boolean }`
+- User selects a warehouse
+- User scans a barcode or searches for an item by name
+- If the item is known, it is selected automatically
+- If the barcode is not recognised, the user is prompted to create a new product
+- User enters the quantity arriving (must be at least 1)
+- If the warehouse uses bins, the user must select a bin
+- Confirming records the addition and shows the updated stock level
 
 ---
 
-#### US-3.2: Warn Owner of Stock Shortfall
+### US-2.2: Create a New Product While Scanning
 
-**DFD Flow**: [#flow-2-remove-stock](dfd_level0.md#flow-2-remove-stock) (warning path)
+**Who**: Family User
 
-**Role**: Owner
-
-**Story**: As an owner, I want the system to alert when removal would cause negative stock, so mistakes are prevented.
+**Story**: As a user, I want to create a new product on the spot when I scan an unknown barcode, so I can keep working without switching to a different screen.
 
 **Acceptance Criteria**:
 
-- When removal quantity > available balance, system computes delta
-- Owner receives notification (UI alert or log entry) with item, warehouse, and shortfall amount
-- Owner can approve override or reject removal
-- If approved, REMOVE movement includes `override_by_owner` flag
-- Audit trail records owner decision
+- When a scanned barcode matches no existing product, a prompt appears inline
+- User enters a product name (required) and optional description
+- The new product is saved with the scanned barcode attached
+- The user can then continue the stock addition without restarting
 
 ---
 
-### Group 4: Transfer Stock `#flow-3-transfer-stock`
+## Group 3: Remove Stock (Consumption)
 
-#### US-4.1: Transfer Stock Between Warehouses
+### US-3.1: Remove Stock by Scanning a Barcode
 
-**DFD Flow**: [#flow-3-transfer-stock](dfd_level0.md#flow-3-transfer-stock)
+**Who**: Family User
 
-**Role**: Family User
-
-**Story**: As a user, I want to transfer items between warehouses, so inventory location stays correct.
+**Story**: As a user, I want to scan an item and record how many were taken out, so inventory reflects what has been sold or used.
 
 **Acceptance Criteria**:
 
-- User scans item
-- User enters quantity
-- User selects source warehouse
-- User selects destination warehouse
-- If source warehouse `use_bins = true`, user selects source bin
-- If destination warehouse `use_bins = true`, user selects destination bin
-- System validates sufficient stock in source
-- Confirm creates TRANSFER movement
-- Source balance decreases, destination balance increases
-- Data contract (from dfd_level0.md):
-  - Request: `{ item_id: UUID, quantity: int (>0), source_warehouse_id: UUID, dest_warehouse_id: UUID, source_bin_id?: UUID, dest_bin_id?: UUID }`
-  - Response: `{ movement_id: UUID, item_id: UUID, quantity: int, source_warehouse_id: UUID, dest_warehouse_id: UUID, source_balance_after: int, dest_balance_after: int }`
+- User selects a warehouse
+- User scans or searches for an item
+- User enters the quantity to remove (must be at least 1)
+- If the warehouse uses bins, the user must select a bin
+- If there is enough stock, the removal is recorded immediately
+- If there is not enough stock, the user sees a warning and the removal is paused for owner approval
 
 ---
 
-### Group 5: Quick Count (Reconciliation) `#flow-4-quick-count`
+### US-3.2: Owner Approves a Stock Shortfall
 
-#### US-5.1: Quick Count Items and Reconcile Inventory
+**Who**: Owner
 
-**DFD Flow**: [#flow-4-quick-count](dfd_level0.md#flow-4-quick-count)
-
-**Role**: Family User
-
-**Story**: As a user, I want to quickly count items on a shelf and update inventory, so discrepancies are corrected easily.
+**Story**: As an owner, I want to review and approve removals that would take stock below zero, so I can catch mistakes while still allowing legitimate exceptions.
 
 **Acceptance Criteria**:
 
-- User selects warehouse
-- If warehouse `use_bins = true`, user selects bin
-- User scans item
-- User enters observed quantity (int ≥ 0)
-- System computes delta = observed - recorded_balance
-- System creates COUNT_ADJUSTMENT movement with delta
-- System updates balance to observed quantity
-- UI displays adjustment details: "was X, now Y (delta: ±Z)"
-- Data contract (from dfd_level0.md):
-  - Request: `{ warehouse_id: UUID, bin_id?: UUID, item_id: UUID, observed_quantity: int (≥0) }`
-  - Response: `{ movement_id: UUID, item_id: UUID, previous_balance: int, new_balance: int, delta: int, movement_type: 'COUNT_ADJUSTMENT' }`
+- When a removal would result in negative stock, the app shows a clear warning with the item name, warehouse, and how short we are
+- The owner can approve or reject the removal
+- If approved, the removal is recorded with a note that it was owner-approved
+- If rejected, nothing changes in the inventory
+- The decision is recorded in the movement history
 
 ---
 
-### Group 6: Inventory Visibility (Read Operations)
+## Group 4: Transfer Stock
 
-#### US-6.1: View Inventory Level and Location
+### US-4.1: Transfer Stock Between Warehouses
 
-**Role**: Owner, Family User
+**Who**: Family User
 
-**Story**: As a user, I want to search or scan an item and see current inventory across warehouses and bins, so I know stock availability immediately.
+**Story**: As a user, I want to move items from one warehouse to another, so the records reflect where stock has physically moved to.
 
 **Acceptance Criteria**:
 
-- User can search by barcode, item name, or item ID
-- System returns item details: name, description, barcodes
-- Inventory display aggregates movement log to show current balance by (warehouse, bin?, item)
-- If warehouse `use_bins = true`, balance shows per-bin breakdown
-- If warehouse `use_bins = false`, balance shows warehouse-level total
+- User scans or searches for an item
+- User enters the quantity to move (must be at least 1)
+- User selects a source warehouse and a destination warehouse
+- If the source warehouse uses bins, user selects the source bin
+- If the destination warehouse uses bins, user selects the destination bin
+- The system checks there is enough stock at the source before allowing the transfer
+- Confirming reduces the source balance and increases the destination balance
 
 ---
 
-#### US-6.2: View Movement History for Item
+## Group 5: Quick Count (Stocktake)
 
-**Role**: Owner, Family User
+### US-5.1: Correct Stock Levels After a Physical Count
 
-**Story**: As a user, I want to see the history of movements for an item, so I understand why inventory changed.
+**Who**: Family User
+
+**Story**: As a user, I want to scan an item, enter the quantity I can actually see on the shelf, and have the system update the record, so discrepancies are fixed quickly.
 
 **Acceptance Criteria**:
 
-- Item detail page displays timestamp-sorted movement log
-- Each movement shows: type, quantity, user, warehouse, bin (if applicable), timestamp
-- Movement types displayed clearly: ADD, REMOVE, TRANSFER, COUNT_ADJUSTMENT, MANUAL_ADJUSTMENT
+- User selects a warehouse (and a bin if applicable)
+- User scans or searches for an item
+- User enters the physical count they observed (can be zero)
+- The system shows the current recorded balance alongside the entered count
+- Confirming updates the balance to the entered count and records the difference
+- The change log shows the previous quantity, the new quantity, and the difference
 
 ---
 
-#### US-6.3: Find Item Location by Bin (if bins enabled)
+## Group 6: Inventory Visibility
 
-**Role**: Owner, Family User
+### US-6.1: Look Up Current Stock Levels
 
-**Story**: As a user, I want to know where an item is stored (bins if applicable), so I can find it quickly.
+**Who**: Owner, Family User
+
+**Story**: As a user, I want to search for an item and instantly see how much is in stock and where it is, so I can answer questions without manually checking.
 
 **Acceptance Criteria**:
 
-- Item detail page displays (warehouse, bin) location(s) where balance > 0
-- If multiple locations, show balance per location
-- Quick action to navigate to physical location (if warehouse UI supports it)
+- User can search by barcode, product name, or browse the product list
+- Results show the product name, description, and all associated barcodes
+- Stock levels are shown broken down by warehouse (and by bin, if bins are enabled)
+- Locations with zero stock are not shown
 
 ---
 
-## Data Contract Summary (from dfd_level0.md)
+### US-6.2: View the Movement History for an Item
 
-Each user story with a DFD flow reference includes boundary data contracts specifying request/response schemas, validation rules, and constraints. During Phase 2 task creation, these contracts map to API endpoint schemas in route files (e.g., `warehouse-backend/src/routes/`).
+**Who**: Owner, Family User
+
+**Story**: As a user, I want to see a chronological log of every stock movement for an item, so I can understand why the balance changed.
+
+**Acceptance Criteria**:
+
+- The item detail page shows a list of all movements, newest first
+- Each entry shows: what type of movement it was (received, removed, transferred, counted, adjusted), the quantity, who did it, which warehouse and bin were involved, and when
+- Movement types are shown in plain language, not codes
 
 ---
 
-## Kanban Task Mapping
+### US-6.3: See Where an Item Is Stored
 
-Each user story (or group of closely related stories) becomes a **Phase 2 `/[DEV] <User Story>`** Kanban task referencing:
+**Who**: Owner, Family User
 
-1. DFD flow number and section link
-2. Boundary data contract for request/response validation
-3. Vertical slice assignment (DB → API route → UI component)
-4. Testing requirements (happy path, error paths, edge cases)
+**Story**: As a user, I want to see a list of every location where an item currently has stock, so I know exactly where to find it in the warehouse.
+
+**Acceptance Criteria**:
+
+- The item detail page lists every warehouse and bin where the item has stock greater than zero
+- The quantity at each location is shown
+- If an item is in multiple locations, all are listed
+
+---
+
+### US-6.4: Bulk Import Starting Balances from a Spreadsheet
+
+**Who**: Owner
+
+**Story**: As an owner, I want to upload a CSV with existing stock quantities, so I can seed the system with real balances when first setting it up.
+
+**Acceptance Criteria**:
+
+- Owner can download a template CSV with the expected columns
+- Owner uploads a filled-in CSV with item SKU, warehouse name, optional bin name, and quantity
+- Valid rows create stock balance records; invalid rows are skipped with a reason given
+- A summary shows how many rows were processed, skipped, and why any failed
