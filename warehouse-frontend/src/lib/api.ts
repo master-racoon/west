@@ -82,11 +82,29 @@ async function getAuthHeaders() {
   return headers;
 }
 
+async function getInventoryAuthHeaders() {
+  const userToken = localStorage.getItem("user_session_token");
+  const ownerToken = localStorage.getItem("session_token");
+  const token = userToken || ownerToken;
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 const apiClient = new WarehouseClient({
   BASE: import.meta.env.VITE_API_URL ?? "",
   WITH_CREDENTIALS: true,
   CREDENTIALS: "include",
   HEADERS: getAuthHeaders,
+});
+
+const inventoryApiClient = new WarehouseClient({
+  BASE: import.meta.env.VITE_API_URL ?? "",
+  WITH_CREDENTIALS: true,
+  CREDENTIALS: "include",
+  HEADERS: getInventoryAuthHeaders,
 });
 
 export const client = {
@@ -117,14 +135,19 @@ export const client = {
       barcode_or_item_id: string;
       quantity: number;
       bin_id?: string;
-    }) => withAuthHandling(apiClient.inventory.addStock({ requestBody: data })),
+    }) =>
+      withAuthHandling(
+        inventoryApiClient.inventory.addStock({ requestBody: data }),
+      ),
     countAdjust: (data: {
       warehouse_id: string;
       item_id: string;
       observed_quantity: number;
       bin_id?: string;
     }) =>
-      withAuthHandling(apiClient.inventory.countAdjust({ requestBody: data })),
+      withAuthHandling(
+        inventoryApiClient.inventory.countAdjust({ requestBody: data }),
+      ),
     removeStock: (data: {
       warehouse_id: string;
       item_id: string;
@@ -134,7 +157,7 @@ export const client = {
       request_owner_approval?: boolean;
     }) =>
       withAuthHandling(
-        apiClient.inventory.removeStock({ requestBody: data as any }),
+        inventoryApiClient.inventory.removeStock({ requestBody: data as any }),
       ),
     transferStock: (data: {
       item_id: string;
@@ -145,7 +168,7 @@ export const client = {
       dest_bin_id?: string;
     }) =>
       withAuthHandling(
-        apiClient.inventory.transferStock({ requestBody: data }),
+        inventoryApiClient.inventory.transferStock({ requestBody: data }),
       ),
     getBalance: (filters?: {
       warehouse_id?: string;
@@ -153,7 +176,7 @@ export const client = {
       item_id?: string;
     }) =>
       withAuthHandling(
-        apiClient.inventory.getInventoryBalance({
+        inventoryApiClient.inventory.getInventoryBalance({
           warehouseId: filters?.warehouse_id,
           binId: filters?.bin_id,
           itemId: filters?.item_id,
@@ -168,7 +191,9 @@ export const client = {
       if (filters?.sku) qs.set("sku", filters.sku);
       const query = qs.toString();
       const url = `${API_BASE}/api/inventory/current-balance${query ? `?${query}` : ""}`;
-      const token = localStorage.getItem("session_token");
+      const token =
+        localStorage.getItem("user_session_token") ||
+        localStorage.getItem("session_token");
       const res = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -188,14 +213,14 @@ export const client = {
       return res.json();
     },
     getRemovalApprovals: () =>
-      withAuthHandling(apiClient.inventory.getRemovalApprovals()),
+      withAuthHandling(inventoryApiClient.inventory.getRemovalApprovals()),
     approveRemovalApproval: (approvalId: string) =>
       withAuthHandling(
-        apiClient.inventory.approveRemovalApproval({ id: approvalId }),
+        inventoryApiClient.inventory.approveRemovalApproval({ id: approvalId }),
       ),
     rejectRemovalApproval: (approvalId: string) =>
       withAuthHandling(
-        apiClient.inventory.rejectRemovalApproval({ id: approvalId }),
+        inventoryApiClient.inventory.rejectRemovalApproval({ id: approvalId }),
       ),
     createManualMovement: async (data: {
       item_id: string;
@@ -213,7 +238,9 @@ export const client = {
       note?: string;
       created_at: string;
     }> => {
-      const token = localStorage.getItem("session_token");
+      const token =
+        localStorage.getItem("user_session_token") ||
+        localStorage.getItem("session_token");
       const res = await fetch(`${API_BASE}/api/inventory/movements`, {
         method: "POST",
         headers: {

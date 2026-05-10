@@ -20,7 +20,7 @@ async function fetchSession() {
 }
 
 export function useAuth() {
-  const { user, setUser, clearUser } = useAuthStore();
+  const { user, setUser, clearUser, clearUserSession } = useAuthStore();
   const navigate = useNavigate();
 
   const { isLoading, refetch } = useQuery({
@@ -45,7 +45,9 @@ export function useAuth() {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     localStorage.removeItem("session_token");
+    localStorage.removeItem("user_session_token");
     clearUser();
+    clearUserSession();
     navigate("/login");
   };
 
