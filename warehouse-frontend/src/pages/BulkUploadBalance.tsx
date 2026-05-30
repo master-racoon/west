@@ -3,7 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import { bulkUploadBalance } from "../lib/api";
 
 const TEMPLATE_CSV = `sku,warehouse_name,bin_name,quantity
-SKU-001,Main Warehouse,,50
+SKU-001,Main Warehouse,Shelf A,50
 SKU-002,Main Warehouse,Shelf A,10
 SKU-003,Second Warehouse,,0
 `;
