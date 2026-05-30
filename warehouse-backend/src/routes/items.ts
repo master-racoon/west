@@ -1589,6 +1589,8 @@ barcodeLookupRouter.openapi(lookupBarcodeRoute, async (c) => {
     .from(barcode)
     .innerJoin(item, eq(barcode.item_id, item.id))
     .where(eq(barcode.barcode, barcodeValue.trim()))
+    .or()
+    .where(eq(item, eq(item.id, barcodeValue.trim())))
     .limit(1);
 
   if (results.length === 0) {
