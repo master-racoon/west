@@ -17,3 +17,9 @@ When delegating to the build agent, use `agentName: "build"` parameter explicitl
 ```
 runSubagent(agentName: "build", description: "short label", prompt: "...")
 ```
+
+## Auth/Authz naming drift
+
+Recurring mistake: naming mixed auth helper files as `authorization` or `middleware` when they only expose request guard helpers like `getAuth`, `requireAuth`, and `requireRole`.
+
+Rule: use `authorization` only when the file is primarily about permission decisions; use `middleware` only when it exports actual framework middleware. For mixed authn/authz helper files, prefer `auth` or `auth-guards`.
