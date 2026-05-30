@@ -1581,16 +1581,18 @@ barcodeLookupRouter.openapi(lookupBarcodeRoute, async (c) => {
 
   const db = c.get("db");
   const { barcode: barcodeValue } = c.req.valid("param");
+  const trimmedValue = barcodeValue.trim();
   const results = await db
     .select({
       item_id: item.id,
       item_name: item.name,
+      barcode_value: barcode.barcode,
+      sku_value: itemSku.sku,
     })
-    .from(barcode)
-    .innerJoin(item, eq(barcode.item_id, item.id))
-    .where(eq(barcode.barcode, barcodeValue.trim()))
-    .or()
-    .where(eq(item, eq(item.id, barcodeValue.trim())))
+    .from(item)
+    .leftJoin(barcode, eq(barcode.item_id, item.id))
+    .leftJoin(itemSku, eq(itemSku.item_id, item.id))
+    .where(or(eq(barcode.barcode, trimmedValue), eq(itemSku.sku, trimmedValue)))
     .limit(1);
 
   if (results.length === 0) {

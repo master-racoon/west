@@ -745,19 +745,11 @@ async function resolveItemId(db: any, barcodeOrItemId: string) {
     return skuMatch[0].item_id;
   }
 
-  const itemMatch = await db
-    .select({
-      id: item.id,
-    })
-    .from(item)
-    .where(eq(item.id, barcodeValue))
-    .limit(1);
-
-  if (!itemMatch.length) {
+  if (!skuMatch.length) {
     throw new NotFoundError("Item not found");
   }
 
-  return itemMatch[0].id;
+  return skuMatch[0].id;
 }
 
 async function getBinRecord(db: any, warehouseId: string, binId: string) {
