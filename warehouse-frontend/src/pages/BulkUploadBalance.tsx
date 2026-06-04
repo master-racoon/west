@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { bulkUploadBalance } from "../lib/api";
+import { client } from "../lib/api";
 
 const TEMPLATE_CSV = `sku,warehouse_name,bin_name,quantity
 SKU-001,Main Warehouse,Shelf A,50
@@ -85,6 +86,38 @@ export function BulkUploadBalancePage() {
               className="text-sm text-blue-600 hover:text-blue-800 underline"
             >
               Download template
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const items = await client.items.getItems();
+                  const lines = ["name,sku"];
+                  for (const it of items) {
+                    const name = (it.name ?? "").replace(/"/g, '""');
+                    const sku = (
+                      it.skus && it.skus.length > 0 ? it.skus[0] : ""
+                    ).replace(/"/g, '""');
+                    lines.push(`"${name}","${sku}"`);
+                  }
+                  const csv = lines.join("\n");
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "current-balance-template.csv";
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                } catch (err) {
+                  // eslint-disable-next-line no-console
+                  console.error("Failed to download template", err);
+                }
+              }}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              Download product list
             </button>
           </div>
 
@@ -184,7 +217,10 @@ export function BulkUploadBalancePage() {
                       </tr>
                     ))}
                   </tbody>
-                  <p>You can reupload the whole file after you have made changes without affecting the already processed. </p>
+                  <p>
+                    You can reupload the whole file after you have made changes
+                    without affecting the already processed.{" "}
+                  </p>
                 </table>
               </div>
             )}

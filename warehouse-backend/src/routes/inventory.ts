@@ -565,6 +565,35 @@ const getCurrentBalanceRoute = createRoute({
   },
 });
 
+const getCurrentBalanceCsvRoute = createRoute({
+  method: "get",
+  path: "/current-balance.csv",
+  tags: ["Inventory"],
+  operationId: "downloadCurrentBalanceCsv",
+  summary: "Download current stock levels as CSV",
+  request: {
+    query: CurrentBalanceQuery,
+  },
+  responses: {
+    200: {
+      description: "CSV file",
+      content: {
+        "text/csv": {
+          schema: z.string(),
+        },
+      },
+    },
+    401: {
+      description: "Authentication required",
+      content: {
+        "application/json": {
+          schema: ErrorResponse,
+        },
+      },
+    },
+  },
+});
+
 const getRemovalApprovalsRoute = createRoute({
   method: "get",
   path: "/removal-approvals",
@@ -1869,6 +1898,131 @@ inventoryRouter.openapi(getCurrentBalanceRoute, async (c) => {
   return c.json(response, 200);
 });
 
+inventoryRouter.openapi(getCurrentBalanceCsvRoute, async (c) => {
+  requireAuth(c);
+
+  const db = c.get("db");
+  const { warehouse_id, sku } = c.req.valid("query");
+
+  const whereClauses = [];
+
+  if (warehouse_id) {
+    whereClauses.push(sql`bal.warehouse_id = ${warehouse_id}::uuid`);
+  }
+
+  if (sku) {
+    whereClauses.push(
+      sql`i.id IN (SELECT item_id FROM item_sku WHERE sku ILIKE ${sku})`,
+    );
+  }
+
+  const whereSql = whereClauses.length
+    ? sql`AND ${sql.join(whereClauses, sql` AND `)}`
+    : sql``;
+
+  const result = await db.execute(sql`
+    WITH balance AS (
+      SELECT
+        warehouse_id,
+        bin_id,
+        item_id,
+        SUM(quantity)::int AS quantity
+      FROM (
+        SELECT
+          ${movement.dest_warehouse_id} AS warehouse_id,
+          ${movement.dest_bin_id} AS bin_id,
+          ${movement.item_id} AS item_id,
+          ${movement.quantity} AS quantity
+        FROM ${movement}
+        WHERE ${movement.dest_warehouse_id} IS NOT NULL
+        UNION ALL
+        SELECT
+          ${movement.source_warehouse_id} AS warehouse_id,
+          ${movement.source_bin_id} AS bin_id,
+          ${movement.item_id} AS item_id,
+          (${movement.quantity} * -1) AS quantity
+        FROM ${movement}
+        WHERE ${movement.source_warehouse_id} IS NOT NULL
+      ) mv
+      GROUP BY warehouse_id, bin_id, item_id
+    )
+    SELECT
+      i.id AS item_id,
+      i.name AS item_name,
+      bal.warehouse_id,
+      w.name AS warehouse_name,
+      bal.bin_id,
+      bn.name AS bin_name,
+      bal.quantity
+    FROM balance bal
+    INNER JOIN ${item} i ON i.id = bal.item_id
+    INNER JOIN ${warehouse} w ON w.id = bal.warehouse_id
+    LEFT JOIN ${bin} bn ON bn.id = bal.bin_id
+    WHERE 1=1 ${whereSql}
+    ORDER BY i.name, w.name, bn.name NULLS FIRST
+  `);
+
+  const rows = Array.isArray(result) ? result : (result.rows ?? []);
+
+  const itemIds = [...new Set(rows.map((r: any) => String(r.item_id)))];
+  const skusByItemId: Record<string, string[]> = {};
+
+  if (itemIds.length > 0) {
+    const skuResult = await db.execute(sql`
+      SELECT item_id::text, sku
+      FROM ${itemSku}
+      WHERE item_id = ANY(ARRAY[${sql.join(
+        itemIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )}])
+      ORDER BY sku
+    `);
+    const skuRows = Array.isArray(skuResult)
+      ? skuResult
+      : (skuResult.rows ?? []);
+    for (const row of skuRows) {
+      const id = String(row.item_id);
+      if (!skusByItemId[id]) skusByItemId[id] = [];
+      skusByItemId[id].push(String(row.sku));
+    }
+  }
+
+  function esc(v: unknown) {
+    if (v === null || v === undefined) return "";
+    const s = String(v);
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+
+  let csv =
+    "item_id,item_name,sku,warehouse_id,warehouse_name,bin_id,bin_name,quantity\n";
+
+  for (const row of rows) {
+    const id = String(row.item_id);
+    const sku =
+      skusByItemId[id] && skusByItemId[id].length > 0
+        ? skusByItemId[id][0]
+        : "";
+    const line = [
+      row.item_id,
+      row.item_name,
+      sku,
+      row.warehouse_id,
+      row.warehouse_name,
+      row.bin_id ?? "",
+      row.bin_name ?? "",
+      String(row.quantity),
+    ]
+      .map(esc)
+      .join(",");
+    csv += line + "\n";
+  }
+
+  c.header("Content-Type", "text/csv; charset=utf-8");
+  c.header("Content-Disposition", 'attachment; filename="current-balance.csv"');
+
+  return c.body(csv, 200);
+});
+
 inventoryRouter.openapi(getRemovalApprovalsRoute, async (c) => {
   const auth = requireAuth(c);
   const db = c.get("db");
@@ -2041,6 +2195,28 @@ inventoryRouter.post("/bulk-balance", async (c) => {
 
   const db = c.get("db");
 
+  // When an owner performs movements on behalf of a personal user account,
+  // the client must provide an acting user session token so movements can be
+  // attributed to a real user UUID (not the owner string id).
+  const actingUserToken =
+    c.req.header("X-Acting-User-Token") || c.req.header("x-acting-user-token");
+  if (!actingUserToken) {
+    return c.json({ error: "X-Acting-User-Token header is required" }, 400);
+  }
+  const actingRows = await db
+    .select()
+    .from(session)
+    .where(eq(session.token, actingUserToken))
+    .limit(1);
+  if (
+    !actingRows.length ||
+    actingRows[0].role !== "user" ||
+    !actingRows[0].user_id
+  ) {
+    return c.json({ error: "Invalid acting user token" }, 400);
+  }
+  const actingUserId = actingRows[0].user_id as string;
+
   let formData: FormData;
   try {
     formData = await c.req.formData();
@@ -2184,7 +2360,7 @@ inventoryRouter.post("/bulk-balance", async (c) => {
 
       await db.insert(movement).values({
         type: "COUNT_ADJUSTMENT",
-        user_id: auth.id,
+        user_id: actingUserId,
         item_id: itemId,
         ...(isPositiveDelta
           ? {

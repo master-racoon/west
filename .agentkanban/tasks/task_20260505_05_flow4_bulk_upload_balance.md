@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-4.2 Bulk Upload Current Balance via CSV"
-lane: todo
+lane: done
 created: 2026-05-05T00:00:00Z
-updated: 2026-05-05T00:00:00Z
+updated: 2026-06-04T13:01:25.820Z
 description: Owner can upload a CSV to set opening/current stock balances, creating COUNT_ADJUSTMENT movements in bulk
 labels:
   - flow-4-quick-count
-sortOrder: 14
+sortOrder: -1.75
 slug: flow4_bulk_upload_balance
 ---
 

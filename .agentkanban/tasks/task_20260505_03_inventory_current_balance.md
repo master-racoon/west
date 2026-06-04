@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-6.4 View Current Inventory Balance"
-lane: todo
+lane: done
 created: 2026-05-05T00:00:00Z
-updated: 2026-05-05T00:00:00Z
+updated: 2026-06-04T13:01:23.533Z
 description: Users can see the current stock balance per item across all warehouses and bins
 labels:
   - inventory-visibility
-sortOrder: 12
+sortOrder: -0.5
 slug: inventory_current_balance
 ---
 

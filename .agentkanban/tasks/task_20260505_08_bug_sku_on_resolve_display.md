@@ -2,11 +2,11 @@
 title: "[BUG] US-2.4 Show SKU on Resolved Item (Resolve Buttons)"
 lane: todo
 created: 2026-05-05T00:00:00Z
-updated: 2026-05-05T00:00:00Z
+updated: 2026-06-04T13:01:44.354Z
 description: After resolving an item via the Resolve button, the SKU is not displayed in the resolved item confirmation area on scan pages
 labels:
   - flow-1-add-stock
-sortOrder: 17
+sortOrder: 1775260800000
 slug: bug_sku_on_resolve_display
 ---
 

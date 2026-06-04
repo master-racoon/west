@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-5.5 Edit Products"
-lane: todo
+lane: done
 created: 2026-05-05T00:00:00Z
-updated: 2026-05-05T00:00:00Z
+updated: 2026-06-04T13:01:27.004Z
 description: Owner can edit item name, description, and manage its SKUs/barcodes
 labels:
   - flow-5-configuration
-sortOrder: 11
+sortOrder: -1.875
 slug: flow5_edit_items
 ---
 

@@ -248,7 +248,9 @@ export const client = {
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        ...(ownerToken || userToken ? { Authorization: `Bearer ${ownerToken || userToken}` } : {}),
+        ...(ownerToken || userToken
+          ? { Authorization: `Bearer ${ownerToken || userToken}` }
+          : {}),
         ...(userToken ? { "X-Acting-User-Token": userToken } : {}),
       };
 
@@ -397,7 +399,20 @@ export async function bulkUploadBalance(file: File): Promise<{
 }> {
   const formData = new FormData();
   formData.append("file", file);
-  const headers = await getAuthHeaders();
+  // Send owner's session in Authorization and include the personal
+  // user's session token as `X-Acting-User-Token` when present so the
+  // backend can attribute movements to a personal user account.
+  const ownerToken = localStorage.getItem("session_token");
+  const userToken = localStorage.getItem("user_session_token");
+  const headers: Record<string, string> = {
+    // Do not set `Content-Type` when sending FormData; the browser
+    // will set the proper multipart boundary.
+    ...(ownerToken || userToken
+      ? { Authorization: `Bearer ${ownerToken || userToken}` }
+      : {}),
+    ...(userToken ? { "X-Acting-User-Token": userToken } : {}),
+  };
+
   const response = await fetch(`${API_BASE}/api/inventory/bulk-balance`, {
     method: "POST",
     headers,

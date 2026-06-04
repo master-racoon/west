@@ -3,6 +3,7 @@ import {
   useInventoryCurrentBalance,
   type CurrentBalanceFilter,
 } from "../hooks/queries/useInventory";
+
 import { useWarehouses } from "../hooks/queries/useWarehouses";
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -70,6 +71,48 @@ export function CurrentBalancePage() {
             placeholder="Filter by SKU..."
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
+          <button
+            type="button"
+            onClick={async () => {
+              const qs = new URLSearchParams();
+              if (selectedWarehouseId)
+                qs.set("warehouse_id", selectedWarehouseId);
+              if (debouncedSku) qs.set("sku", debouncedSku);
+              const query = qs.toString();
+              const url = `${import.meta.env.VITE_API_URL ?? ""}/api/inventory/current-balance.csv${
+                query ? `?${query}` : ""
+              }`;
+              const token =
+                localStorage.getItem("user_session_token") ||
+                localStorage.getItem("session_token");
+
+              try {
+                const res = await fetch(url, {
+                  headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (!res.ok) {
+                  // eslint-disable-next-line no-console
+                  console.error("Failed to download CSV", res.status);
+                  return;
+                }
+                const blob = await res.blob();
+                const link = document.createElement("a");
+                const objectUrl = URL.createObjectURL(blob);
+                link.href = objectUrl;
+                link.download = "current-balance.csv";
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(objectUrl);
+              } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error(err);
+              }
+            }}
+            className="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm shadow-sm hover:bg-blue-700"
+          >
+            Download CSV
+          </button>
         </div>
 
         {isLoading && (

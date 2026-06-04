@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-5.6 Bulk Upload Products via CSV"
-lane: todo
+lane: done
 created: 2026-05-05T00:00:00Z
-updated: 2026-05-05T00:00:00Z
+updated: 2026-06-04T13:01:24.736Z
 description: Owner can upload a CSV file to create multiple products (items + SKUs) in one operation
 labels:
   - flow-5-configuration
-sortOrder: 13
+sortOrder: -1.5
 slug: flow5_bulk_upload_products
 ---
 

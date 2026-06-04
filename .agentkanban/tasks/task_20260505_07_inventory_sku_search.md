@@ -1,13 +1,13 @@
 ---
 title: "[DEV] US-6.5 SKU Search Across All Lookup Fields"
-lane: todo
+lane: done
 created: 2026-05-05T00:00:00Z
-updated: 2026-05-05T00:00:00Z
+updated: 2026-06-04T13:01:31.163Z
 description: All item-lookup inputs (AddStock, RemoveStock, Transfer, QuickCount, CreateMovement) accept SKU as a valid search term, and the resolve endpoint returns the matching item
 labels:
   - inventory-visibility
   - flow-1-add-stock
-sortOrder: 16
+sortOrder: -1.96875
 slug: inventory_sku_search
 ---
 

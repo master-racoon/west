@@ -1,12 +1,12 @@
 ---
 title: "[DEV] US-7.1 Create Manual Movements"
-lane: todo
+lane: done
 created: 2026-05-05T00:00:00Z
-updated: 2026-05-05T00:00:00Z
+updated: 2026-06-04T13:01:29.650Z
 description: Owner can create ad-hoc MANUAL_ADJUSTMENT movements directly from a form, without the scan-first flow
 labels:
   - flow-5-configuration
-sortOrder: 15
+sortOrder: -1.9375
 slug: create_manual_movement
 ---
 

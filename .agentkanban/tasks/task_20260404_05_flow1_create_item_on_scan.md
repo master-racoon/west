@@ -1,11 +1,13 @@
 ---
 title: "[DEV] US-2.2 Create Item On-the-Fly During Scan"
-lane: todo
+lane: done
 created: 2026-04-04T00:00:00Z
-updated: 2026-04-04T00:00:00Z
-description: "User creates new item and assigns barcode when scanning unknown product"
+updated: 2026-06-04T13:01:52.066Z
+description: User creates new item and assigns barcode when scanning unknown product
 labels:
   - flow-1-add-stock
+sortOrder: -1.984375
+slug: flow1_create_item_on_scan
 ---
 
 ## DFD Reference
