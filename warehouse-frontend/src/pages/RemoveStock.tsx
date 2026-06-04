@@ -150,7 +150,7 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
 
     if (!value) {
       setResolvedItem(null);
-      setBarcodeError("Scan or enter a barcode, SKU, or item ID");
+      setBarcodeError("Scan a barcode, or enter a SKU");
       return;
     }
 
@@ -413,7 +413,7 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
                     onKeyDown={handleBarcodeKeyDown}
                     autoFocus
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Scan barcode or enter SKU or item ID"
+                    placeholder="Scan a barcode, or enter a SKU"
                     disabled={removeStockMutation.isPending}
                   />
                 </div>
@@ -439,7 +439,7 @@ export function RemoveStockPage({ embedded = false }: RemoveStockPageProps) {
                 <p>
                   {resolvedItem
                     ? `Resolved item: ${resolvedItem.name}${resolvedItem.sku ? ` (SKU: ${resolvedItem.sku})` : ""}`
-                    : "Resolve a barcode, SKU, or item ID before removing stock."}
+                    : "Scan a barcode, or enter a SKU"}
                 </p>
                 <p>
                   {selectedWarehouse

@@ -130,7 +130,7 @@ export function TransferStockPage({
 
     if (!value) {
       setResolvedItem(null);
-      setBarcodeError("Scan or enter a barcode, SKU, or item ID");
+      setBarcodeError("Scan a barcode, or enter a SKU");
       return;
     }
 
@@ -326,7 +326,7 @@ export function TransferStockPage({
                   onKeyDown={handleBarcodeKeyDown}
                   autoFocus
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Scan barcode or enter SKU or item ID"
+                  placeholder="Scan a barcode, or enter a SKU"
                   disabled={transferStockMutation.isPending}
                 />
               </div>
@@ -352,7 +352,7 @@ export function TransferStockPage({
               <p>
                 {resolvedItem
                   ? `Resolved item: ${resolvedItem.name}${resolvedItem.sku ? ` (SKU: ${resolvedItem.sku})` : ""}`
-                  : "Resolve a barcode, SKU, or item ID before transferring stock."}
+                  : "Scan a barcode, or enter a SKU"}
               </p>
               <p>
                 {sourceWarehouse

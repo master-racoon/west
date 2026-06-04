@@ -89,16 +89,24 @@ export function BulkUploadBalancePage() {
           </div>
 
           <p className="text-sm text-gray-500">
-            Columns:{" "}
+            Columns:
+            <br />
             <code className="font-mono bg-gray-100 px-1 rounded">sku</code>{" "}
-            (required),{" "}
+            (required)
+            <br />
             <code className="font-mono bg-gray-100 px-1 rounded">
               warehouse_name
+            </code>
+            (required)
+            <br />
+            <code className="font-mono bg-gray-100 px-1 rounded">
+              bin_name
             </code>{" "}
-            (required),{" "}
-            <code className="font-mono bg-gray-100 px-1 rounded">bin_name</code>{" "}
-            (optional),{" "}
-            <code className="font-mono bg-gray-100 px-1 rounded">quantity</code>{" "}
+            <b>(leave blank if bins are not turned on)</b>
+            <br />
+            <code className="font-mono bg-gray-100 px-1 rounded">
+              quantity
+            </code>{" "}
             (required, integer ≥ 0).
           </p>
 
@@ -176,6 +184,7 @@ export function BulkUploadBalancePage() {
                       </tr>
                     ))}
                   </tbody>
+                  <p>You can reupload the whole file after you have made changes without affecting the already processed. </p>
                 </table>
               </div>
             )}

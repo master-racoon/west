@@ -1067,7 +1067,7 @@ itemsRouter.post("/bulk", async (c) => {
     rowNum: number;
     name: string;
     description?: string;
-    sku?: string;
+    sku: string;
     barcode?: string;
   };
 
@@ -1078,7 +1078,8 @@ itemsRouter.post("/bulk", async (c) => {
 
     const cols = line.split(",").map((col: string) => col.trim());
     const name = nameIdx < cols.length ? cols[nameIdx] : "";
-    if (!name) continue;
+    const sku = skuIdx < cols.length ? cols[skuIdx] : "";
+    if (!name || sku) continue;
 
     rows.push({
       rowNum: i + 1,
@@ -1087,10 +1088,7 @@ itemsRouter.post("/bulk", async (c) => {
         descIdx >= 0 && descIdx < cols.length && cols[descIdx]
           ? cols[descIdx]
           : undefined,
-      sku:
-        skuIdx >= 0 && skuIdx < cols.length && cols[skuIdx]
-          ? cols[skuIdx]
-          : undefined,
+      sku,
       barcode:
         barcodeIdx >= 0 && barcodeIdx < cols.length && cols[barcodeIdx]
           ? cols[barcodeIdx]

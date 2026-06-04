@@ -174,7 +174,7 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
     if (!value) {
       setResolvedItem(null);
       setSelectedItemId("");
-      showBarcodeError("Scan or enter a barcode, SKU, or item ID");
+      showBarcodeError("Scan a barcode, or enter a SKU");
       return;
     }
 
@@ -471,7 +471,7 @@ export function QuickCountPage({ embedded = false }: QuickCountPageProps) {
                   onKeyDown={handleBarcodeKeyDown}
                   autoFocus
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Scan barcode or enter SKU or item ID"
+                  placeholder="Scan a barcode, or enter a SKU"
                   disabled={countAdjustMutation.isPending}
                 />
               </div>

@@ -87,14 +87,18 @@ export function BulkUploadProductsPage() {
           </div>
 
           <p className="text-sm text-gray-500">
-            Columns:{" "}
-            <code className="font-mono bg-gray-100 px-1 rounded">name</code>{" "}
-            (required),{" "}
+            Columns: <br />
+            <code className="font-mono bg-gray-100 px-1 rounded">name</code>
+            (required)
+            <br />
             <code className="font-mono bg-gray-100 px-1 rounded">
               description
             </code>
-            , <code className="font-mono bg-gray-100 px-1 rounded">sku</code>,{" "}
-            <code className="font-mono bg-gray-100 px-1 rounded">barcode</code>.
+            <br />
+            <code className="font-mono bg-gray-100 px-1 rounded">sku</code>(required)
+            <br />
+            <code className="font-mono bg-gray-100 px-1 rounded">barcode</code>
+            <br />
             Rows with the same name are grouped into one product.
           </p>
 

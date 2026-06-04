@@ -60,7 +60,7 @@ export function AddStockPage({ embedded = false }: AddStockPageProps) {
 
     if (!value) {
       setResolvedItem(null);
-      setBarcodeError("Scan or enter a barcode, SKU, or item ID");
+      setBarcodeError("Scan a barcode, or enter a SKU");
       return;
     }
 
