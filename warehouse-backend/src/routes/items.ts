@@ -1079,7 +1079,7 @@ itemsRouter.post("/bulk", async (c) => {
     const cols = line.split(",").map((col: string) => col.trim());
     const name = nameIdx < cols.length ? cols[nameIdx] : "";
     const sku = skuIdx < cols.length ? cols[skuIdx] : "";
-    if (!name || sku) continue;
+    if (!name || !sku) continue;
 
     rows.push({
       rowNum: i + 1,

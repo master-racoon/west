@@ -238,15 +238,23 @@ export const client = {
       note?: string;
       created_at: string;
     }> => {
-      const token =
-        localStorage.getItem("user_session_token") ||
-        localStorage.getItem("session_token");
+      // Manual movements are owner-only but must be attributable to a
+      // personal user account. Send the owner's session in Authorization
+      // and include the personal user's session token in
+      // `X-Acting-User-Token` so the server can validate and attribute
+      // the movement to that user.
+      const ownerToken = localStorage.getItem("session_token");
+      const userToken = localStorage.getItem("user_session_token");
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(ownerToken || userToken ? { Authorization: `Bearer ${ownerToken || userToken}` } : {}),
+        ...(userToken ? { "X-Acting-User-Token": userToken } : {}),
+      };
+
       const res = await fetch(`${API_BASE}/api/inventory/movements`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers,
         body: JSON.stringify(data),
       });
       if (res.status === 401) {

@@ -64,7 +64,7 @@ No schema changes. `movement` table supports `MANUAL_ADJUSTMENT` type already.
 ## Acceptance Criteria
 
 - [ ] Owner can create a MANUAL_ADJUSTMENT movement with positive or negative quantity
-- [ ] Item lookup works by SKU, barcode, or item ID
+- [ ] Item lookup works by SKU or barcode
 - [ ] Warehouse and bin selection is available
 - [ ] Note field is optional but surfaced in movement history
 - [ ] Movement appears in audit history with type MANUAL_ADJUSTMENT

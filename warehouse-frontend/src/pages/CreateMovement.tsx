@@ -12,7 +12,7 @@ import { useAuthStore } from "../stores/authStore";
 import { ScanOverlay } from "../components/ScanOverlay";
 
 export function CreateMovementPage() {
-  const { user } = useAuthStore();
+  const { user, userUser } = useAuthStore();
   const barcodeInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
   const [barcodeOrItemId, setBarcodeOrItemId] = useState("");
@@ -56,6 +56,32 @@ export function CreateMovementPage() {
     );
   }
 
+  // Owner must be acting as a personal user when creating manual movements
+  if (user?.role === "owner" && !userUser) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-3xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-950 shadow-sm">
+            <h1 className="text-2xl font-bold">Owner Session Active</h1>
+            <p className="mt-3 text-sm leading-6">
+              Manual movements must be created while signed in as a personal
+              user. Use the Inventory workspace to continue as a user while
+              keeping your owner session active.
+            </p>
+            <div className="mt-4">
+              <a
+                href="/dashboard/inventory"
+                className="inline-flex items-center rounded bg-amber-800 px-4 py-2 text-sm font-medium text-white hover:bg-amber-900"
+              >
+                Continue as User
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const resetScanFields = () => {
     setBarcodeOrItemId("");
     setQuantity("");
@@ -75,7 +101,7 @@ export function CreateMovementPage() {
 
     if (!value) {
       setResolvedItem(null);
-      setBarcodeError("Scan or enter a barcode, SKU, or item ID");
+      setBarcodeError("Scan a barcode, or enter a SKU");
       return;
     }
 
@@ -290,7 +316,7 @@ export function CreateMovementPage() {
                   onKeyDown={handleBarcodeKeyDown}
                   autoFocus
                   className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Scan barcode or enter SKU or item ID"
+                  placeholder="Scan a barcode, or enter a SKU"
                   disabled={createMovementMutation.isPending}
                 />
                 <button
@@ -314,7 +340,7 @@ export function CreateMovementPage() {
               <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
                 {resolvedItem
                   ? `Resolved item: ${resolvedItem.name}${resolvedItem.sku ? ` (SKU: ${resolvedItem.sku})` : ""}`
-                  : "Resolve a barcode, SKU, or item ID before submitting."}
+                  : "Scan a barcode, or enter a SKU"}
               </div>
             </div>
 
@@ -376,7 +402,7 @@ export function CreateMovementPage() {
 
         {showScanner && (
           <ScanOverlay
-            onScan={handleScanResult}
+            onBarcodeScan={handleScanResult}
             onClose={() => setShowScanner(false)}
           />
         )}

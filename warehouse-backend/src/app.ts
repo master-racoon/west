@@ -59,11 +59,14 @@ app.use("*", async (c, next) => {
   }
 
   c.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  c.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Acting-User-Token",
+  );
   c.header("Access-Control-Allow-Credentials", "true");
 
   if (c.req.method === "OPTIONS") {
-    return c.text("", 204 as any);
+    return c.body(null, 204);
   }
 
   await next();

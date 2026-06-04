@@ -8,6 +8,7 @@ import {
   itemSku,
   movement,
   removalApproval,
+  session,
   warehouse,
 } from "../db/schema";
 import {
@@ -1614,6 +1615,31 @@ inventoryRouter.openapi(createManualMovementRoute, async (c) => {
     throw new ForbiddenError("Owner role required");
   }
 
+  // Manual movements must be created by an owner, but they must also be
+  // attributable to a personal user account. Expect the client to provide
+  // a personal user session token in the `X-Acting-User-Token` header.
+  // Validate that token and use its `user_id` for the movement record.
+  const actingUserToken =
+    c.req.header("X-Acting-User-Token") || c.req.header("x-acting-user-token");
+  if (!actingUserToken) {
+    throw new ForbiddenError(PERSONAL_USER_ACCOUNT_REQUIRED_MESSAGE);
+  }
+
+  const actingRows = await c
+    .get("db")
+    .select()
+    .from(session)
+    .where(eq(session.token, actingUserToken))
+    .limit(1);
+  if (
+    !actingRows.length ||
+    actingRows[0].role !== "user" ||
+    !actingRows[0].user_id
+  ) {
+    throw new ForbiddenError(PERSONAL_USER_ACCOUNT_REQUIRED_MESSAGE);
+  }
+  const actingUserId = actingRows[0].user_id as string;
+
   const db = c.get("db");
   const data = c.req.valid("json");
 
@@ -1639,7 +1665,7 @@ inventoryRouter.openapi(createManualMovementRoute, async (c) => {
     .insert(movement)
     .values({
       type: "MANUAL_ADJUSTMENT",
-      user_id: auth.id,
+      user_id: actingUserId,
       item_id: data.item_id,
       ...(isPositive
         ? {

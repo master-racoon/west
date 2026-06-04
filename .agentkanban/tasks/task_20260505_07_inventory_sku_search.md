@@ -56,7 +56,7 @@ No dedicated UI changes required. Because all lookup flows already use `resolveI
 - `QuickCount.tsx`
 - `CreateMovement.tsx` (new, from US-7.1)
 
-Add placeholder text update: `"Scan barcode, enter SKU, or item ID"` (already matches but verify on all pages).
+Add placeholder text update: `"Scan barcode or enter SKU"` (already matches but verify on all pages).
 
 ---
 
